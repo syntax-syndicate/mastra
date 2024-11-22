@@ -1,0 +1,123 @@
+```yaml
+openapi: 3.0.0
+info:
+  title: Browserbase API
+  description: API documentation for Browserbase
+  version: 1.0.0
+servers:
+  - url: https://www.browserbase.com
+paths:
+  /v1/sessions/{sessionId}:
+    get:
+      summary: Retrieve information from a Session
+      description: Use this endpoint to get information from a specific Session.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: ID of the Session to retrieve information from
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+  /reference/api/connect:
+    get:
+      summary: Connect to a Session
+      description: Use WebSocket or HTTP to connect or create a Session on-the-fly
+      responses:
+        '200':
+          description: Successful connection
+  /reference/api/list-all-sessions:
+    get:
+      summary: List all Sessions
+      description: Get full control of the Browser’s Sessions
+      responses:
+        '200':
+          description: Successful response
+  /reference/api/upload-an-extension:
+    post:
+      summary: Upload a Chrome extension
+      description: Configure custom Chrome extensions for your Sessions
+      responses:
+        '200':
+          description: Extension uploaded successfully
+  /reference/sdk/nodejs:
+    get:
+      summary: Node.js SDK
+      description: Information about the Node.js SDK
+      responses:
+        '200':
+          description: Successful request
+  /reference/sdk/python:
+    get:
+      summary: Python SDK
+      description: Information about the Python SDK
+      responses:
+        '200':
+          description: Successful request
+  /reference/api/create-a-session:
+    get:
+      summary: Create a Session
+      description: Create a new session
+      responses:
+        '200':
+          description: Session created successfully
+  /reference/api/connect-over-websocket:
+    get:
+      summary: Connect over WebSocket
+      description: Connect using WebSocket for Puppeteer and Playwright
+      responses:
+        '200':
+          description: Successful connection
+  /reference/api/connect-over-http:
+    get:
+      summary: Connect over HTTP
+      description: Connect using HTTP for Selenium
+      responses:
+        '200':
+          description: Successful connection
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-bb-api-key
+    apiKeyAuthQuery:
+      type: apiKey
+      in: query
+      name: apiKey
+  parameters:
+    sessionId:
+      name: sessionId
+      in: query
+      description: ID of an already created Session
+      required: false
+      schema:
+        type: string
+    enableProxy:
+      name: enableProxy
+      in: query
+      description: Enable proxy
+      required: false
+      schema:
+        type: boolean
+    session-id:
+      name: session-id
+      in: header
+      description: Session ID created via the HTTP API
+      required: true
+      schema:
+        type: string
+    enable-proxy:
+      name: enable-proxy
+      in: header
+      description: Enable proxy
+      required: false
+      schema:
+        type: string
+```
