@@ -1,0 +1,118 @@
+```yaml
+openapi: 3.0.0
+info:
+  title: Browserbase API
+  description: API documentation for Browserbase
+  version: 1.0.0
+servers:
+  - url: https://www.browserbase.com
+  - url: https://connect.browserbase.com
+paths:
+  /v1/sessions/{sessionId}:
+    get:
+      summary: Retrieve information from a Session
+      description: Use this endpoint to get information from a specific Session.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: ID of the Session to retrieve information from
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  information:
+                    type: object
+                  logs:
+                    type: array
+                    items:
+                      type: string
+      security:
+        - APIKeyAuth: []
+    post:
+      summary: Create a new Session
+      description: Use this endpoint to create a new Session.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+      security:
+        - APIKeyAuth: []
+  /webdriver:
+    post:
+      summary: Create a Session
+      description: Create a new session using Selenium
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+      responses:
+        '200':
+          description: Session created successfully
+  /connect:
+    get:
+      summary: Connect to a Session
+      description: Connect to an existing session
+      parameters:
+        - name: apiKey
+          in: query
+          description: API key for authentication
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: query
+          description: ID of an already created session
+          schema:
+            type: string
+        - name: enableProxy
+          in: query
+          description: Enable proxy
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Connected successfully
+components:
+  schemas:
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        status:
+          type: string
+  securitySchemes:
+    APIKeyAuth:
+      type: apiKey
+      in: header
+      name: x-bb-api-key
+```
