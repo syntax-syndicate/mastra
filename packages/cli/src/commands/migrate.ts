@@ -10,19 +10,20 @@ const spinner = yoctoSpinner({ text: 'Migrating Database\n' });
 export async function migrate(createOnly = false, dbUrl: string) {
   spinner.start();
   try {
-    await checkPostgresReady(dbUrl);
+    await runMigrations(dbUrl);
     spinner.success('Migration complete! Your project is ready to go.');
-    process.exit(0);
+    process.exit(1);
   } catch (error: any) {
-    spinner.error('Could not migrate database');
     if (error instanceof ExecaError) {
       console.error('error');
-    } else {
-      console.log(`Error: ${error.message}`);
     }
-
-    process.exit(1);
+    spinner.error('Could not migrate database');
+    console.log(`Error: ${error.message}`, true);
+    if (error.stderr) {
+      console.log(`stderr: ${error.stderr}`, true);
+    }
   }
+  return false;
 }
 
 interface MigrationResult {
@@ -35,6 +36,7 @@ export async function _migrate(createOnly = false, dbUrl: string, swallow: boole
   const migrateScript = require(path.join(enginePath, 'dist/postgres/migrate.js'));
 
   const stdioMode = swallow ? 'pipe' : 'inherit';
+  console.log({ enginePath, dbUrl });
   const subprocess = execa(`pnpx tsx ./dist/postgres/migrate.js`, {
     env: {
       ...process.env,
@@ -79,7 +81,7 @@ export async function _migrate(createOnly = false, dbUrl: string, swallow: boole
 async function checkPostgresReady(dbUrl: string) {
   for (let i = 0; i < 10; i++) {
     try {
-      await runMigrations(dbUrl); // attempts to create the migration w/o applying it
+      await _migrate(true, dbUrl, true); // attempts to create the migration w/o applying it
       return true;
     } catch (error) {
       if (error instanceof Error) {

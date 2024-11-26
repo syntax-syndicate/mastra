@@ -1,7 +1,7 @@
 #! /usr/bin/env node
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { retro } from 'gradient-string';
+import figlet from 'figlet';
 
 import { createNewAgent } from './commands/agents/createNewAgent.js';
 import { listAgents } from './commands/agents/listAgents.js';
@@ -11,27 +11,18 @@ import { init } from './commands/init.js';
 import { installEngineDeps } from './commands/installEngineDeps.js';
 import { migrate } from './commands/migrate.js';
 import { provision } from './commands/provision.js';
-import { serve } from './commands/serve.js';
 import { getEnv } from './utils/getEnv.js';
+import { serve } from './commands/serve.js';
 import { setupEnvFile } from './utils/setupEnvFile.js';
 
 const program = new Command();
 const version = '0.1.57-alpha.4';
 
-const text = retro(`
-███╗   ███╗ █████╗ ███████╗████████╗██████╗  █████╗ 
-████╗ ████║██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔══██╗
-██╔████╔██║███████║███████╗   ██║   ██████╔╝███████║
-██║╚██╔╝██║██╔══██║╚════██║   ██║   ██╔══██╗██╔══██║
-██║ ╚═╝ ██║██║  ██║███████║   ██║   ██║  ██║██║  ██║
-╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝
-`);
-
 program
   .version(`${version}`)
   .description(`mastra CLI ${version}`)
   .action(() => {
-    console.log(text);
+    console.log(chalk.bold(figlet.textSync('Mastra')));
   });
 
 program
