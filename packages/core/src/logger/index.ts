@@ -1,11 +1,11 @@
-import { Redis } from '@upstash/redis';
+import { Redis, } from '@upstash/redis';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 
-// Constants and Types
 export const RegisteredLogger = {
   AGENT: 'AGENT',
   WORKFLOW: 'WORKFLOW',
+  LLM: 'LLM',
 } as const;
 
 export type RegisteredLogger =
@@ -25,6 +25,8 @@ export interface BaseLogMessage {
   message: string;
   destinationPath: string;
   type: RegisteredLogger;
+  logId?: string;
+  logGroupId?: string;
 }
 
 export interface Logger<T extends BaseLogMessage = BaseLogMessage> {
@@ -36,21 +38,28 @@ export interface Logger<T extends BaseLogMessage = BaseLogMessage> {
 }
 
 // Configuration Types
-export type LoggerConfig =
-  | { type: 'CONSOLE'; level?: LogLevel }
-  | { type: 'FILE'; level?: LogLevel; dirPath?: string }
-  | {
-      type: 'UPSTASH';
-      level?: LogLevel;
-      url: string;
-      token: string;
-      key?: string;
-    };
+
+type ConsoleLoggerConfig = { type: 'CONSOLE' ; level?: LogLevel }
+type FileLoggerConfig = { type: 'FILE'; level?: LogLevel; dirPath?: string }
+type UpstashLoggerConfig = {
+  type: 'UPSTASH';
+  level?: LogLevel;
+  url: string;
+  token: string;
+  key?: string;
+};
+
+type LoggerConfig = ConsoleLoggerConfig | FileLoggerConfig | UpstashLoggerConfig
+
+type LoggerTypeMap = {
+  'CONSOLE': ConsoleLogger;
+  'FILE': FileLogger;
+  'UPSTASH': UpstashRedisLogger;
+}
 
 // Abstract Base Logger
 export abstract class BaseLogger<T extends BaseLogMessage = BaseLogMessage>
-  implements Logger<T>
-{
+  implements Logger<T> {
   protected level: LogLevel;
 
   constructor(level: LogLevel = LogLevel.INFO) {
@@ -101,10 +110,20 @@ export abstract class BaseLogger<T extends BaseLogMessage = BaseLogMessage>
       message: this.formatMessage(message),
     };
   }
+
+  async getLogs(): Promise<string[]> {
+    console.warn(`getLogs is not implemented for ${this.constructor.name}`);
+    return [];
+  }
+
+  async getLogsByGroupId(logGroupId: string): Promise<string[]> {
+    console.warn(`getLogsByGroupId : ${logGroupId} is not implemented for ${this.constructor.name}`);
+    return []
+  }
 }
 
 // Console Logger Implementation
-class ConsoleLogger<
+export class ConsoleLogger<
   T extends BaseLogMessage = BaseLogMessage,
 > extends BaseLogger<T> {
   constructor(level?: LogLevel) {
@@ -121,7 +140,7 @@ class ConsoleLogger<
 }
 
 // File Logger Implementation
-class FileLogger<
+export class FileLogger<
   T extends BaseLogMessage = BaseLogMessage,
 > extends BaseLogger<T> {
   #dirPath: string;
@@ -169,7 +188,7 @@ class FileLogger<
 }
 
 // Upstash Redis Logger Implementation
-class UpstashRedisLogger<
+export class UpstashRedisLogger<
   T extends BaseLogMessage = BaseLogMessage,
 > extends BaseLogger<T> {
   #redis: Redis;
@@ -199,6 +218,11 @@ class UpstashRedisLogger<
     return this.#redis.lrange(this.#key, 0, -1);
   }
 
+  async getLogsByGroupId(logGroupId: string): Promise<string[]> {
+    return this.#redis.lrange(logGroupId, 0, -1);
+  }
+
+
   async cleanup(): Promise<void> {
     // Cleanup Redis connection if needed
   }
@@ -206,8 +230,7 @@ class UpstashRedisLogger<
 
 // Multi Logger Implementation
 export class MultiLogger<T extends BaseLogMessage = BaseLogMessage>
-  implements Logger<T>
-{
+  implements Logger<T> {
   private loggers: Logger<T>[];
 
   constructor(loggers: Logger<T>[]) {
@@ -251,27 +274,34 @@ export class MultiLogger<T extends BaseLogMessage = BaseLogMessage>
 
 // Factory function for built-in loggers
 // In createLogger function
-export function createLogger<T extends BaseLogMessage = BaseLogMessage>(
-  config: LoggerConfig
-): Logger<T> {
+export const createLogger = <
+  Type extends LoggerConfig['type'],
+  T extends BaseLogMessage = BaseLogMessage
+>(
+  config: Extract<LoggerConfig, { type: Type }>
+): LoggerTypeMap[Type] => {
   switch (config.type) {
     case 'CONSOLE':
-      return new ConsoleLogger<T>(config.level);
-
-    case 'FILE':
-      return new FileLogger<T>(config.dirPath, config.level);
-
-    case 'UPSTASH':
+      return new ConsoleLogger<T>(config.level) as LoggerTypeMap[Type];
+    case 'FILE': {
+      const fileConfig = config as FileLoggerConfig;
+      return new FileLogger<T>(fileConfig.dirPath, fileConfig.level) as LoggerTypeMap[Type];
+    }
+    case 'UPSTASH': {
+      const upstashConfig = config as UpstashLoggerConfig;
       const redis = new Redis({
-        url: config.url,
-        token: config.token,
+        url: upstashConfig.url,
+        token: upstashConfig.token,
       });
-      return new UpstashRedisLogger<T>(redis, config.key, config.level);
-
-    default:
-      throw new Error(`Unsupported logger type`);
+      return new UpstashRedisLogger<T>(redis, upstashConfig.key, upstashConfig.level) as LoggerTypeMap[Type];
+    }
+    default: {
+      const exhaustiveCheck: never = config.type;
+      throw new Error(`Unsupported logger type: ${exhaustiveCheck}`);
+    }
   }
-}
+};
+
 
 export function createMultiLogger<T extends BaseLogMessage = BaseLogMessage>(
   loggers: Logger<T>[]

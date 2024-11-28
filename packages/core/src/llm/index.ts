@@ -24,7 +24,7 @@ import { z, ZodSchema } from 'zod';
 import { AllTools, CoreTool, ToolApi } from '../tools/types';
 import { delay } from '../utils';
 import { Integration } from '../integration';
-import { createLogger, Logger } from '../logger';
+import { createLogger, Logger, LogLevel, RegisteredLogger, BaseLogMessage } from '../logger';
 import {
   CustomModelConfig,
   EmbeddingModelConfig,
@@ -44,12 +44,34 @@ export class LLM<
   >,
 > {
   #tools: Record<TKeys, ToolApi>;
-  logger: Logger;
-
-  constructor(logger?: Logger) {
+  #logger: Logger;
+  logGroupId?: string;
+  constructor({logGroupId}: {logGroupId?: string} = {}) {
     this.#tools = {} as Record<TKeys, ToolApi>;
-    this.logger = logger || createLogger({ type: 'CONSOLE' });
+    this.#logger = createLogger({ type: 'CONSOLE' });
+    this.logGroupId = logGroupId;
   }
+
+/**
+   * Internal logging helper that formats and sends logs to the configured logger
+   * @param level - Severity level of the log
+   * @param message - Main log message
+   */
+ #log (level: LogLevel, message: string) {
+    if (!this.#logger) return;
+
+    const logMessage: BaseLogMessage = {
+      type: RegisteredLogger.LLM,
+      message,
+      destinationPath: 'LLM',
+      logGroupId: this.logGroupId,
+    };
+
+    const logMethod = level.toLowerCase() as keyof Logger<BaseLogMessage>;
+
+    this.#logger[logMethod]?.(logMessage);
+  }
+
 
   /**
    * Set the concrete tools for the agent
@@ -57,10 +79,19 @@ export class LLM<
    */
   __setTools(tools: Record<TKeys, ToolApi>) {
     this.#tools = tools;
-    this.logger.debug(`Tools set for LLM`, tools);
+     this.#log('DEBUG', `Tools set for LLM`);
   }
 
-  getModelType(model: ModelConfig): string {
+   /**
+   * Set the logger for the agent
+   * @param logger
+   */
+  __setLogger(logger: Logger) {
+    this.#logger = logger;
+   this.#log('DEBUG', `Logger updated for LLM`);
+  }
+
+  async getModelType(model: ModelConfig): Promise<string> {
     if (!('provider' in model)) {
       throw new Error('Model provider is required');
     }
@@ -85,9 +116,7 @@ export class LLM<
     const type =
       providerToType[model.provider as LLMProvider] ?? model.provider;
 
-    this.logger.debug(
-      `Model type resolved to ${type} for provider ${model.provider}`
-    );
+   this.#log('DEBUG', `Model type resolved to ${type} for provider ${model.provider}`);
 
     return type;
   }
@@ -105,9 +134,7 @@ export class LLM<
     modelName?: string;
     fetch?: typeof globalThis.fetch;
   }): LanguageModelV1 {
-    this.logger.debug(
-      `Creating OpenAI compatible model with baseURL: ${baseURL}`
-    );
+    this.#log('DEBUG', `Creating OpenAI compatible model with baseURL: ${baseURL}`);
     const client = createOpenAI({
       baseURL,
       apiKey,
@@ -116,7 +143,7 @@ export class LLM<
     return client(modelName || defaultModelName);
   }
 
-  createModelDef({
+  async createModelDef({
     model,
   }: {
     model: {
@@ -127,12 +154,10 @@ export class LLM<
       fetch?: typeof globalThis.fetch;
       apiKey?: string;
     };
-  }): LanguageModelV1 {
+  }): Promise<LanguageModelV1> {
     let modelDef: LanguageModelV1;
     if (model.type === 'openai') {
-      this.logger.info(
-        `Initializing OpenAI model ${model.name || 'gpt-4o-2024-08-06'}`
-      );
+      await this.#log('DEBUG', `Initializing OpenAI model ${model.name || 'gpt-4o-2024-08-06'}`);
       const openai = createOpenAI({
         apiKey: model?.apiKey || process.env.OPENAI_API_KEY,
       });
@@ -140,28 +165,20 @@ export class LLM<
         structuredOutputs: true,
       });
     } else if (model.type === 'anthropic') {
-      this.logger.info(
-        `Initializing Anthropic model ${
-          model.name || 'claude-3-5-sonnet-20240620'
-        }`
-      );
+      await this.#log('DEBUG', `Initializing Anthropic model ${model.name || 'claude-3-5-sonnet-20240620'}`);
       const anthropic = createAnthropic({
         apiKey: model?.apiKey || process.env.ANTHROPIC_API_KEY,
       });
       modelDef = anthropic(model.name || 'claude-3-5-sonnet-20240620');
     } else if (model.type === 'google') {
-      this.logger.info(
-        `Initializing Google model ${model.name || 'gemini-1.5-pro-latest'}`
-      );
+      await this.#log('DEBUG', `Initializing Google model ${model.name || 'gemini-1.5-pro-latest'}`);
       const google = createGoogleGenerativeAI({
         baseURL: 'https://generativelanguage.googleapis.com/v1beta',
         apiKey: model?.apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
       });
       modelDef = google(model.name || 'gemini-1.5-pro-latest');
     } else if (model.type === 'groq') {
-      this.logger.info(
-        `Initializing Groq model ${model.name || 'llama-3.2-90b-text-preview'}`
-      );
+      await this.#log('DEBUG', `Initializing Groq model ${model.name || 'llama-3.2-90b-text-preview'}`);
       modelDef = this.createOpenAICompatibleModel({
         baseURL: 'https://api.groq.com/openai/v1',
         apiKey: model?.apiKey || process.env.GROQ_API_KEY || '',
@@ -169,11 +186,7 @@ export class LLM<
         modelName: model.name,
       });
     } else if (model.type === 'perplexity') {
-      this.logger.info(
-        `Initializing Perplexity model ${
-          model.name || 'llama-3.1-sonar-large-128k-chat'
-        }`
-      );
+      await this.#log('DEBUG', `Initializing Perplexity model ${model.name || 'llama-3.1-sonar-large-128k-chat'}`);
       modelDef = this.createOpenAICompatibleModel({
         baseURL: 'https://api.perplexity.ai/',
         apiKey: model?.apiKey || process.env.PERPLEXITY_API_KEY || '',
@@ -181,11 +194,7 @@ export class LLM<
         modelName: model.name,
       });
     } else if (model.type === 'fireworks') {
-      this.logger.info(
-        `Initializing Fireworks model ${
-          model.name || 'llama-v3p1-70b-instruct'
-        }`
-      );
+      await this.#log('DEBUG', `Initializing Fireworks model ${model.name || 'llama-v3p1-70b-instruct'}`);
       modelDef = this.createOpenAICompatibleModel({
         baseURL: 'https://api.fireworks.ai/inference/v1',
         apiKey: model?.apiKey || process.env.FIREWORKS_API_KEY || '',
@@ -193,9 +202,7 @@ export class LLM<
         modelName: model.name,
       });
     } else if (model.type === 'togetherai') {
-      this.logger.info(
-        `Initializing TogetherAI model ${model.name || 'google/gemma-2-9b-it'}`
-      );
+      await this.#log('DEBUG', `Initializing TogetherAI model ${model.name || 'google/gemma-2-9b-it'}`);
       modelDef = this.createOpenAICompatibleModel({
         baseURL: 'https://api.together.xyz/v1/',
         apiKey: model?.apiKey || process.env.TOGETHER_AI_API_KEY || '',
@@ -203,13 +210,11 @@ export class LLM<
         modelName: model.name,
       });
     } else if (model.type === 'lmstudio') {
-      this.logger.info(
-        `Initializing LMStudio model ${model.name || 'llama-3.2-1b'}`
-      );
+      await this.#log('DEBUG', `Initializing LMStudio model ${model.name || 'llama-3.2-1b'}`);
 
       if (!model?.baseURL) {
         const error = `LMStudio model requires a baseURL`;
-        this.logger.error(error);
+        await this.#log('ERROR', error);
         throw new Error(error);
       }
       modelDef = this.createOpenAICompatibleModel({
@@ -219,12 +224,10 @@ export class LLM<
         modelName: model.name,
       });
     } else if (model.type === 'baseten') {
-      this.logger.info(
-        `Initializing BaseTen model ${model.name || 'llama-3.1-70b-instruct'}`
-      );
+      await this.#log('DEBUG', `Initializing BaseTen model ${model.name || 'llama-3.1-70b-instruct'}`);
       if (model?.fetch) {
         const error = `Custom fetch is required to use ${model.type}. see https://docs.baseten.co/api-reference/openai for more information`;
-        this.logger.error(error);
+        await this.#log('ERROR', error);
         throw new Error(error);
       }
       modelDef = this.createOpenAICompatibleModel({
@@ -234,9 +237,7 @@ export class LLM<
         modelName: model.name,
       });
     } else if (model.type === 'mistral') {
-      this.logger.info(
-        `Initializing Mistral model ${model.name || 'pixtral-large-latest'}`
-      );
+      await this.#log('DEBUG', `Initializing Mistral model ${model.name || 'pixtral-large-latest'}`);
       const mistral = createMistral({
         baseURL: 'https://api.mistral.ai/v1',
         apiKey: model?.apiKey || process.env.MISTRAL_API_KEY || '',
@@ -244,9 +245,7 @@ export class LLM<
 
       modelDef = mistral(model.name || 'pixtral-large-latest');
     } else if (model.type === 'grok') {
-      this.logger.info(
-        `Initializing X Grok model ${model.name || 'grok-beta'}`
-      );
+      await this.#log('DEBUG', `Initializing X Grok model ${model.name || 'grok-beta'}`);
       const xAi = createXai({
         baseURL: 'https://api.x.ai/v1',
         apiKey: process.env.XAI_API_KEY ?? '',
@@ -254,9 +253,7 @@ export class LLM<
 
       modelDef = xAi(model.name || 'grok-beta');
     } else if (model.type === 'cohere') {
-      this.logger.info(
-        `Initializing Cohere model ${model.name || 'command-r-plus'}`
-      );
+      await this.#log('DEBUG', `Initializing Cohere model ${model.name || 'command-r-plus'}`);
       const cohere = createCohere({
         baseURL: 'https://api.cohere.com/v2',
         apiKey: model?.apiKey || process.env.COHERE_API_KEY || '',
@@ -264,18 +261,14 @@ export class LLM<
 
       modelDef = cohere(model.name || 'command-r-plus');
     } else if (model.type === 'azure') {
-      this.logger.info(
-        `Initializing Azure model ${model.name || 'gpt-35-turbo-instruct'}`
-      );
+      await this.#log('DEBUG', `Initializing Azure model ${model.name || 'gpt-35-turbo-instruct'}`);
       const azure = createAzure({
         resourceName: process.env.AZURE_RESOURCE_NAME || '',
         apiKey: model?.apiKey || process.env.AZURE_API_KEY || '',
       });
       modelDef = azure(model.name || 'gpt-35-turbo-instruct');
     } else if (model.type === 'amazon') {
-      this.logger.info(
-        `Initializing Amazon model ${model.name || 'amazon-titan-tg1-large'}`
-      );
+      await this.#log('DEBUG', `Initializing Amazon model ${model.name || 'amazon-titan-tg1-large'}`);
       const amazon = createAmazonBedrock({
         region: process.env.AWS_REGION || '',
         accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
@@ -284,11 +277,7 @@ export class LLM<
       });
       modelDef = amazon(model.name || 'amazon-titan-tg1-large');
     } else if (model.type === 'anthropic-vertex') {
-      this.logger.info(
-        `Initializing Anthropic Vertex model ${
-          model.name || 'claude-3-5-sonnet@20240620'
-        }`
-      );
+      await this.#log('DEBUG', `Initializing Anthropic Vertex model ${model.name || 'claude-3-5-sonnet@20240620'}`);
       const anthropicVertex = createAnthropicVertex({
         region: process.env.GOOGLE_VERTEX_REGION,
         projectId: process.env.GOOGLE_VERTEX_PROJECT_ID,
@@ -297,7 +286,7 @@ export class LLM<
       modelDef = anthropicVertex(model.name || 'claude-3-5-sonnet@20240620');
     } else {
       const error = `Invalid model type: ${model.type}`;
-      this.logger.error(error);
+      await this.#log('ERROR', error);
       throw new Error(error);
     }
 
@@ -379,7 +368,7 @@ export class LLM<
     let modelDef;
 
     if ('type' in model) {
-      modelDef = this.createModelDef({ model });
+      modelDef = await this.createModelDef({ model });
     } else {
       if (model.model instanceof Function) {
         modelDef = await model.model();
@@ -419,7 +408,7 @@ export class LLM<
       {} as Record<TKeys, CoreTool>
     );
 
-    this.logger.debug(`Converted tools for LLM`, converted);
+    this.#log('DEBUG', `Converted tools for LLM`);
     return converted;
   }
 
@@ -498,7 +487,7 @@ export class LLM<
 
     if ('name' in model) {
       modelToPass = {
-        type: this.getModelType(model),
+        type: await this.getModelType(model),
         name: model.name,
         toolChoice: model.toolChoice,
         apiKey: model.provider !== 'LM_STUDIO' ? model?.apiKey : undefined,
@@ -531,13 +520,13 @@ export class LLM<
             10
           ) < 2000
         ) {
-          this.logger.warn('Rate limit approaching, waiting 10 seconds');
+          this.#log('WARN', 'Rate limit approaching, waiting 10 seconds');
           await delay(10 * 1000);
         }
       },
     };
 
-    this.logger.debug(`Generating text with ${messages.length} messages`);
+   this.#log('DEBUG', `Generating text with ${messages.length} messages`);
     return await generateText({
       messages,
       ...argsForExecute,
@@ -563,7 +552,7 @@ export class LLM<
 
     if ('name' in model) {
       modelToPass = {
-        type: this.getModelType(model),
+        type: await this.getModelType(model),
         name: model.name,
         toolChoice: model.toolChoice,
         apiKey: model.provider !== 'LM_STUDIO' ? model?.apiKey : undefined,
@@ -596,13 +585,13 @@ export class LLM<
             10
           ) < 2000
         ) {
-          this.logger.warn('Rate limit approaching, waiting 10 seconds');
+          this.#logger.warn('Rate limit approaching, waiting 10 seconds');
           await delay(10 * 1000);
         }
       },
     };
 
-    this.logger.debug(`Generating text with ${messages.length} messages`);
+  this.#log('DEBUG', `Generating text with ${messages.length} messages`);
 
     const schema = this.createOutputSchema(structuredOutput);
     return await generateObject({
@@ -631,7 +620,7 @@ export class LLM<
     let modelToPass;
     if ('name' in model) {
       modelToPass = {
-        type: this.getModelType(model),
+        type: await this.getModelType(model),
         name: model.name,
         toolChoice: model.toolChoice,
         apiKey: model.provider !== 'LM_STUDIO' ? model?.apiKey : undefined,
@@ -664,7 +653,7 @@ export class LLM<
             10
           ) < 2000
         ) {
-          this.logger.warn('Rate limit approaching, waiting 10 seconds');
+          this.#log('WARN', 'Rate limit approaching, waiting 10 seconds');
           await delay(10 * 1000);
         }
       },
@@ -673,7 +662,7 @@ export class LLM<
       },
     };
 
-    this.logger.debug(`Streaming text with ${messages.length} messages`);
+   this.#log('DEBUG', `Streaming text with ${messages.length} messages`);
     return await streamText({
       messages,
       ...argsForExecute,
@@ -700,7 +689,7 @@ export class LLM<
     let modelToPass;
     if ('name' in model) {
       modelToPass = {
-        type: this.getModelType(model),
+        type: await this.getModelType(model),
         name: model.name,
         toolChoice: model.toolChoice,
         apiKey: model.provider !== 'LM_STUDIO' ? model?.apiKey : undefined,
@@ -733,7 +722,7 @@ export class LLM<
             10
           ) < 2000
         ) {
-          this.logger.warn('Rate limit approaching, waiting 10 seconds');
+          this.#logger.warn('Rate limit approaching, waiting 10 seconds');
           await delay(10 * 1000);
         }
       },
@@ -742,7 +731,7 @@ export class LLM<
       },
     };
 
-    this.logger.debug(`Streaming text with ${messages.length} messages`);
+     this.#log('DEBUG', `Streaming text with ${messages.length} messages`);
 
     const schema = this.createOutputSchema(structuredOutput);
     return await streamObject({

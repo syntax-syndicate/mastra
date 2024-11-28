@@ -1,6 +1,6 @@
 import { CoreMessage, UserContent } from 'ai';
 import { Integration } from '../integration';
-import { createLogger, Logger } from '../logger';
+import { createLogger, Logger, RegisteredLogger } from '../logger';
 import { AllTools, ToolApi } from '../tools/types';
 import { LLM } from '../llm';
 import { ModelConfig, StructuredOutput } from '../llm/types';
@@ -19,12 +19,13 @@ export class Agent<
   readonly model: ModelConfig;
   readonly enabledTools: Partial<Record<TKeys, boolean>>;
   logger: Logger;
-
+  logGroupId?: string;
   constructor(config: {
     name: string;
     instructions: string;
     model: ModelConfig;
     enabledTools?: Partial<Record<TKeys, boolean>>;
+    logGroupId?: string;
   }) {
     this.name = config.name;
     this.instructions = config.instructions;
@@ -45,7 +46,7 @@ export class Agent<
    */
   __setTools(tools: Record<TKeys, ToolApi>) {
     this.llm.__setTools(tools);
-    this.logger.debug(`Tools set for agent ${this.name}`, tools);
+    this.log(`Tools set for agent ${this.name}`)
   }
 
   /**
@@ -54,8 +55,25 @@ export class Agent<
    */
   __setLogger(logger: Logger) {
     this.logger = logger;
-    this.logger.debug(`Logger updated for agent ${this.name}`);
+    this.log(`Logger updated for agent ${this.name}`)
   }
+
+  private log(message: string) {
+    this.logger.info({
+      message,
+      destinationPath: this.name,
+      type: RegisteredLogger.AGENT,
+      logGroupId: this.logGroupId,
+    });
+  }
+
+  // private error(message: string) {
+  //   this.logger.error({
+  //     message,
+  //     destinationPath: this.name,
+  //     type: RegisteredLogger.AGENT
+  //   });
+  // }
 
   async text({
     messages,
@@ -66,7 +84,7 @@ export class Agent<
     onStepFinish?: (step: string) => void;
     maxSteps?: number;
   }) {
-    this.logger.info(`Starting text generation for agent ${this.name}`);
+    this.log(`Starting text generation for agent ${this.name}`);
 
     const systemMessage: CoreMessage = {
       role: 'system',
@@ -100,7 +118,7 @@ export class Agent<
     onStepFinish?: (step: string) => void;
     maxSteps?: number;
   }) {
-    this.logger.info(`Starting text generation for agent ${this.name}`);
+    this.log(`Starting text generation for agent ${this.name}`);
 
     const systemMessage: CoreMessage = {
       role: 'system',
@@ -135,7 +153,7 @@ export class Agent<
     onFinish?: (result: string) => Promise<void> | void;
     maxSteps?: number;
   }) {
-    this.logger.info(`Starting stream generation for agent ${this.name}`);
+    this.log(`Starting stream generation for agent ${this.name}`);
 
     const systemMessage: CoreMessage = {
       role: 'system',
@@ -172,7 +190,7 @@ export class Agent<
     onFinish?: (result: string) => Promise<void> | void;
     maxSteps?: number;
   }) {
-    this.logger.info(`Starting stream generation for agent ${this.name}`);
+    this.log(`Starting stream generation for agent ${this.name}`);
 
     const systemMessage: CoreMessage = {
       role: 'system',

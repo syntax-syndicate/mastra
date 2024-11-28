@@ -1,6 +1,6 @@
 import { Integration } from '../integration';
 import { Agent } from '../agent';
-import { createLogger, Logger, RegisteredLogger } from '../logger';
+import { BaseLogger, createLogger,  RegisteredLogger } from '../logger';
 import { AllTools, ToolApi } from '../tools/types';
 import { MastraEngine } from '../engine';
 import { MastraVector } from '../vector';
@@ -13,6 +13,7 @@ export class Mastra<
   TIntegrations extends Integration[],
   MastraTools extends Record<string, any>,
   TSyncs extends Record<string, syncApi<any, any>>,
+  TLogger extends BaseLogger = BaseLogger
 > {
   private engine?: MastraEngine;
   private vectors?: Record<string, MastraVector>;
@@ -24,7 +25,7 @@ export class Mastra<
     keyof AllTools<MastraTools, TIntegrations>
   >;
   private integrations: Map<string, Integration>;
-  private logger: Map<RegisteredLogger, Logger>;
+  private logger: Map<RegisteredLogger, TLogger>;
   private syncs: TSyncs;
 
   constructor(config: {
@@ -34,11 +35,11 @@ export class Mastra<
     integrations?: TIntegrations;
     engine?: MastraEngine;
     vectors?: Record<string, MastraVector>;
-    logger?: Logger;
+    logger?: TLogger;
   }) {
     this.logger = new Map();
 
-    let logger: Logger = createLogger({ type: 'CONSOLE' });
+    let logger = createLogger({ type: 'CONSOLE' }) as TLogger;
 
     if (config.logger) {
       logger = config.logger;
@@ -110,6 +111,7 @@ export class Mastra<
       keyof AllTools<MastraTools, TIntegrations>
     >();
     this.llm.__setTools(this.tools);
+  
 
     config.agents?.forEach((agent) => {
       if (this.agents.has(agent.name)) {
@@ -240,7 +242,7 @@ export class Mastra<
     return this.tools;
   }
 
-  public setLogger({ key, logger }: { key: RegisteredLogger; logger: Logger }) {
+  public setLogger({ key, logger }: { key: RegisteredLogger; logger: TLogger }) {
     this.logger.set(key, logger);
   }
 

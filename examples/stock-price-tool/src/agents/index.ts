@@ -12,6 +12,8 @@ export const stockAgent = new Agent<typeof tools>({
     toolChoice: 'required',
   },
   enabledTools: {
-    stockPrices: true,
+   stockPrices: true
   },
 });
+
+export const agents = [stockAgent]

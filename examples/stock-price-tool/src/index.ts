@@ -15,6 +15,9 @@ async function main() {
   const currentPrice = toolCall?.result?.currentPrice;
 
   console.log(`The current price of Apple (AAPL) is $${currentPrice}`);
+
+  const logs = await mastra.getLogger('AGENT')?.getLogs()
+  console.log({ logs })
 }
 
 main();

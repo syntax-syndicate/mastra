@@ -1,4 +1,4 @@
-import { Mastra, createLogger } from '@mastra/core';
+import { Mastra, createLogger, UpstashRedisLogger } from '@mastra/core';
 import { PostgresEngine } from '@mastra/engine';
 
 import { agents } from './agents/test';
@@ -6,7 +6,7 @@ import { integrations } from './integrations';
 import * as syncs from './syncs';
 import * as tools from './tools';
 
-export const mastra = new Mastra<typeof integrations, typeof tools, typeof syncs>({
+export const mastra = new Mastra<typeof integrations, typeof tools, typeof syncs, UpstashRedisLogger>({
   tools,
   syncs,
   engine: new PostgresEngine({
@@ -15,7 +15,9 @@ export const mastra = new Mastra<typeof integrations, typeof tools, typeof syncs
   agents,
   integrations,
   logger: createLogger({
-    type: 'CONSOLE',
-    level: 'INFO',
-  }),
+    type: 'UPSTASH',
+    token: process.env.UPSTASH_API_KEY!,
+    url: process.env.UPSTASH_URL!,
+    key: 'logs',
+  })
 });

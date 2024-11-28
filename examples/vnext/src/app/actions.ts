@@ -15,6 +15,9 @@ export async function testText(messages: string[]) {
 
   console.log({ streamResult: JSON.stringify(streamResult) });
 
+  const logs = await mastra.getLogger('AGENT')?.getLogs()
+  console.log({ logs })
+
   return streamResult?.text;
 }
 
