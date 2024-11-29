@@ -67,15 +67,16 @@ export async function POST(request: Request) {
       threadId: id,
       messages: userMessages,
       onFinish: async (result) => {
-        const { responseMessages } = JSON.parse(result) || {};
+        console.log(JSON.parse(result) || {})
+        const { response } = JSON.parse(result) || {};
         if (session.user && session.user.id) {
           try {
 
-            if (!responseMessages) {
+            if (!response?.messages) {
               return streamingData.close();
             }
 
-            const ms = (Array.isArray(responseMessages) ? responseMessages : [responseMessages])
+            const ms = (Array.isArray(response.messages) ? response.messages : [response.messages])
 
             const responseMessagesWithoutIncompleteToolCalls =
               sanitizeResponseMessages(ms);

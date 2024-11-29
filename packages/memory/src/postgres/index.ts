@@ -212,6 +212,7 @@ export class PgMemory extends MastraMemory {
                     id, 
                     content, 
                     role, 
+                    resourceid,
                     created_at AS createdAt, 
                     thread_id AS threadId
                 FROM mastra_messages
