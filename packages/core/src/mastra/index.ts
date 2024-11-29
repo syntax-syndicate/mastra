@@ -143,6 +143,8 @@ export class Mastra<
     if (config.vectors) {
       this.vectors = config.vectors;
     }
+
+    this.memory = config.memory;
   }
 
   public async sync<K extends keyof TSyncs>(

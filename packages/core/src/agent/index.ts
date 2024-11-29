@@ -96,28 +96,43 @@ export class Agent<
 
   async saveMemory({
     threadId,
+    resourceid,
     userMessages,
   }: {
+    resourceid: string
     threadId?: string;
     userMessages: CoreMessage[]
   }) {
+
+    const genTitle = async () => {
+      const userMessage = this.getMostRecentUserMessage(userMessages)
+      let title = 'New Thread';
+      try {
+        if (userMessage) {
+          title = await this.generateTitleFromUserMessage({ message: userMessage });
+        }
+      } catch (e) {
+        console.error('Error generating title:', e);
+      }
+      return title
+    }
+
     if (this.memory) {
+      console.log({ threadId, resourceid }, 'SAVING')
       let thread: ThreadType | null
       if (!threadId) {
-        const userMessage = this.getMostRecentUserMessage(userMessages)
-        let title = 'New Thread';
-        try {
-          if (userMessage) {
-            title = await this.generateTitleFromUserMessage({ message: userMessage });
-          }
-        } catch (e) {
-          console.error('Error generating title:', e);
-        }
+        const title = await genTitle()
 
-        thread = await this.memory.createThread(title);
+        thread = await this.memory.createThread({ threadId, resourceid, title });
       } else {
         thread = await this.memory.getThreadById({ threadId });
+        if (!thread) {
+          const title = await genTitle()
+          thread = await this.memory.createThread({ threadId, resourceid, title });
+        }
       }
+
+      console.log({ thread })
 
       if (thread) {
         const messages = userMessages.map((u) => {
@@ -132,7 +147,6 @@ export class Agent<
         })
 
         await this.memory.saveMessages({ messages })
-        console.log('Memory here.')
       }
     }
   }
@@ -142,7 +156,9 @@ export class Agent<
     onStepFinish,
     maxSteps = 5,
     threadId,
+    resourceid,
   }: {
+    resourceid?: string
     threadId?: string
     messages: UserContent[];
     onStepFinish?: (step: string) => void;
@@ -160,9 +176,10 @@ export class Agent<
       content: content,
     }));
 
-    if (this.memory) {
+    if (this.memory && resourceid) {
       await this.saveMemory({
         threadId,
+        resourceid,
         userMessages,
       });
     }
@@ -184,7 +201,9 @@ export class Agent<
     onStepFinish,
     maxSteps = 5,
     threadId,
+    resourceid,
   }: {
+    resourceid?: string
     threadId?: string
     messages: UserContent[];
     structuredOutput: StructuredOutput;
@@ -204,9 +223,10 @@ export class Agent<
       content: content,
     }));
 
-    if (this.memory) {
+    if (this.memory && resourceid) {
       await this.saveMemory({
         threadId,
+        resourceid,
         userMessages,
       });
     }
@@ -229,7 +249,9 @@ export class Agent<
     onFinish,
     maxSteps = 5,
     threadId,
+    resourceid,
   }: {
+    resourceid?: string
     threadId?: string
     messages: UserContent[];
     onStepFinish?: (step: string) => void;
@@ -237,10 +259,6 @@ export class Agent<
     maxSteps?: number;
   }) {
     this.logger.info(`Starting stream generation for agent ${this.name}`);
-
-    if (this.memory) {
-      console.log('Memory here.')
-    }
 
     const systemMessage: CoreMessage = {
       role: 'system',
@@ -252,9 +270,10 @@ export class Agent<
       content: content,
     }));
 
-    if (this.memory) {
+    if (this.memory && resourceid) {
       await this.saveMemory({
         threadId,
+        resourceid,
         userMessages,
       });
     }
@@ -278,7 +297,9 @@ export class Agent<
     onFinish,
     maxSteps = 5,
     threadId,
+    resourceid
   }: {
+    resourceid?: string
     threadId?: string
     messages: UserContent[];
     structuredOutput: StructuredOutput;
@@ -287,11 +308,6 @@ export class Agent<
     maxSteps?: number;
   }) {
     this.logger.info(`Starting stream generation for agent ${this.name}`);
-
-
-    if (this.memory) {
-      console.log('Memory here.')
-    }
 
     const systemMessage: CoreMessage = {
       role: 'system',
@@ -303,10 +319,11 @@ export class Agent<
       content: content,
     }));
 
-    if (this.memory) {
+    if (this.memory && resourceid) {
       await this.saveMemory({
         threadId,
         userMessages,
+        resourceid,
       });
     }
 

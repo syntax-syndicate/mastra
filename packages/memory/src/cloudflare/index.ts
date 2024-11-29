@@ -20,6 +20,12 @@ export class CloudflareKVMemory extends MastraMemory {
         return thread;
     }
 
+    async getThreadsByResourceId({ resourceid }: { resourceid: string }): Promise<ThreadType[]> {
+        const threadIds = await this.kv.smembers('threads');
+        const threads = await this.getThreads(threadIds);
+        return threads.filter(thread => thread.resourceid === resourceid);
+    }
+
     async saveThread({ thread }: { thread: ThreadType }): Promise<ThreadType> {
         thread.updatedAt = new Date();
         await this.kv.set(

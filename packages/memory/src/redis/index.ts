@@ -24,6 +24,12 @@ export class RedisMemory extends MastraMemory {
         return thread;
     }
 
+    async getThreadsByResourceId({ resourceid }: { resourceid: string }): Promise<ThreadType[]> {
+        const threadIds = await this.redis.smembers('threads');
+        const threads = await this.getThreads(threadIds);
+        return threads.filter(thread => thread.resourceid === resourceid);
+    }
+
     async saveThread({ thread }: { thread: ThreadType }): Promise<ThreadType> {
         thread.updatedAt = new Date();
         await this.redis.set(
