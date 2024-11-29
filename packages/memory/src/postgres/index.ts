@@ -126,7 +126,7 @@ export class PgMemory extends MastraMemory {
         }
     }
 
-    async getThreadById(threadId: string): Promise<ThreadType | null> {
+    async getThreadById({ threadId }: { threadId: string }): Promise<ThreadType | null> {
         await this.ensureTablesExist();
 
         const client = await this.pool.connect();
@@ -142,7 +142,7 @@ export class PgMemory extends MastraMemory {
         }
     }
 
-    async saveThread(thread: ThreadType): Promise<ThreadType> {
+    async saveThread({ thread }: { thread: ThreadType }): Promise<ThreadType> {
         await this.ensureTablesExist();
 
         const client = await this.pool.connect();
@@ -160,7 +160,7 @@ export class PgMemory extends MastraMemory {
         }
     }
 
-    async saveMessages(messages: MessageType[]): Promise<MessageType[]> {
+    async saveMessages({ messages }: { messages: MessageType[] }): Promise<MessageType[]> {
         await this.ensureTablesExist();
 
         const client = await this.pool.connect();
@@ -183,7 +183,7 @@ export class PgMemory extends MastraMemory {
         }
     }
 
-    async getMessages(threadId: string): Promise<MessageType[]> {
+    async getMessages({ threadId }: { threadId: string }): Promise<MessageType[]> {
         await this.ensureTablesExist();
 
         const client = await this.pool.connect();
@@ -217,29 +217,6 @@ export class PgMemory extends MastraMemory {
             updatedAt: now,
             metadata,
         };
-        return this.saveThread(thread);
-    }
-
-    async addMessage(threadId: string, content: string, role: 'user' | 'assistant'): Promise<MessageType> {
-
-        await this.ensureTablesExist();
-
-        const thread = await this.getThreadById(threadId);
-        if (!thread) {
-            throw new Error(`Thread with ID ${threadId} does not exist.`);
-        }
-
-        const id = randomUUID();
-        const message: MessageType = {
-            id,
-            content,
-            role,
-            createdAt: new Date(),
-            threadId,
-        };
-
-        const [savedMessage] = await this.saveMessages([message]);
-
-        return savedMessage!;
+        return this.saveThread({ thread });
     }
 }

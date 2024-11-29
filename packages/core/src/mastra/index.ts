@@ -8,6 +8,7 @@ import { LLM } from '../llm';
 import { z } from 'zod';
 import { syncApi } from '../sync/types';
 import { StripUndefined } from './types';
+import { MastraMemory } from '../memory';
 
 export class Mastra<
   TIntegrations extends Integration[],
@@ -26,9 +27,11 @@ export class Mastra<
   private integrations: Map<string, Integration>;
   private logger: Map<RegisteredLogger, Logger>;
   private syncs: TSyncs;
+  memory?: MastraMemory;
 
   constructor(config: {
     tools?: MastraTools;
+    memory?: MastraMemory
     syncs?: TSyncs;
     agents?: Agent<MastraTools, TIntegrations>[];
     integrations?: TIntegrations;
@@ -120,6 +123,10 @@ export class Mastra<
       const agentLogger = this.getLogger('AGENT');
       if (agentLogger) {
         agent.__setLogger(agentLogger);
+      }
+
+      if (config.memory) {
+        agent.__setMemory(config.memory);
       }
     });
 
