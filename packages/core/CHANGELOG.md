@@ -1,5 +1,11 @@
 # @mastra/core
 
+## 0.1.27-alpha.49
+
+### Patch Changes
+
+- f5dfa20: only add logger if there is a logger
+
 ## 0.1.27-alpha.48
 
 ### Patch Changes

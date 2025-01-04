@@ -1,5 +1,12 @@
 # @mastra/apollo
 
+## 1.0.1-alpha.28
+
+### Patch Changes
+
+- Updated dependencies [f5dfa20]
+  - @mastra/core@0.1.27-alpha.49
+
 ## 1.0.1-alpha.27
 
 ### Patch Changes
