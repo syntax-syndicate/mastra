@@ -1,3 +1,5 @@
+import { Highlight, themes } from 'prism-react-renderer';
+import type { WorkflowConditionCodeCondition } from '../types';
 import {
   Dialog,
   DialogBody,
@@ -5,12 +7,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@mastra/playground-ui/components/Dialog';
-import { ScrollArea } from '@mastra/playground-ui/components/ScrollArea';
-import { cn } from '@mastra/playground-ui/utils/cn';
-import { Highlight, themes } from 'prism-react-renderer';
-
-import type { WorkflowConditionCodeCondition } from './types';
+} from '@/ds/components/Dialog';
+import { ScrollArea } from '@/ds/components/ScrollArea';
+import { cn } from '@/utils/cn';
 
 export interface WorkflowConditionCodeProps {
   condition: WorkflowConditionCodeCondition;
@@ -51,7 +50,7 @@ export interface WorkflowConditionDialogProps {
 
 export const WorkflowConditionDialog = ({ open, onOpenChange, condition }: WorkflowConditionDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="max-w-[30rem]">
+    <DialogContent style={{ maxWidth: '30rem' }}>
       <DialogHeader>
         <DialogTitle className="sr-only">Condition Function</DialogTitle>
         <DialogDescription>View the condition function code</DialogDescription>
