@@ -1296,6 +1296,7 @@ export type ProviderModelsMap = {
     'cerebras/qwen3-235b-a22b-instruct-2507',
     'consensusprotocol/Qwen3.8-27B',
     'consensusprotocol/deepseek-v4-flash',
+    'consensusprotocol/deepseek-v4.1-flash',
     'consensusprotocol/gemma-4-31b-it',
     'consensusprotocol/glm-5.3-flash',
     'consensusprotocol/gpt-oss-20b',
