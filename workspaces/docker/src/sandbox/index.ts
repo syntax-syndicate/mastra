@@ -159,6 +159,13 @@ export interface DockerSandboxOptions extends Omit<MastraSandboxOptions, 'proces
   cpuPeriod?: number;
   /** Maximum number of PIDs in the container (HostConfig.PidsLimit). */
   pidsLimit?: number;
+  /**
+   * Run an init process (tini) as PID 1 to reap zombie children (HostConfig.Init).
+   * Without this, processes orphaned by a command (e.g. after a timeout/kill) remain
+   * as zombies and keep counting against `pidsLimit`.
+   * @default true
+   */
+  init?: boolean;
   /** Mount the container root filesystem as read-only (HostConfig.ReadonlyRootfs). */
   readonlyRootfs?: boolean;
   /** Linux capabilities to drop (HostConfig.CapDrop), e.g. ['ALL']. */
@@ -270,6 +277,7 @@ export class DockerSandbox extends MastraSandbox {
   private readonly _cpuQuota?: number;
   private readonly _cpuPeriod?: number;
   private readonly _pidsLimit?: number;
+  private readonly _init: boolean;
   private readonly _readonlyRootfs?: boolean;
   private readonly _capDrop?: string[];
   private readonly _capAdd?: string[];
@@ -316,6 +324,7 @@ export class DockerSandbox extends MastraSandbox {
     this._cpuQuota = options.cpuQuota;
     this._cpuPeriod = options.cpuPeriod;
     this._pidsLimit = options.pidsLimit;
+    this._init = options.init ?? true;
     this._readonlyRootfs = options.readonlyRootfs;
     this._capDrop = options.capDrop;
     this._capAdd = options.capAdd;
@@ -432,6 +441,7 @@ export class DockerSandbox extends MastraSandbox {
         CpuQuota: this._cpuQuota,
         CpuPeriod: this._cpuPeriod,
         PidsLimit: this._pidsLimit,
+        Init: this._init,
         ReadonlyRootfs: this._readonlyRootfs,
         CapDrop: this._capDrop,
         CapAdd: this._capAdd,
