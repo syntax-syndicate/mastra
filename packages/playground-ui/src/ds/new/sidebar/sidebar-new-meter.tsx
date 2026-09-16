@@ -89,33 +89,22 @@ function Bloom({ tone }: { tone: SidebarNewMeterTone }) {
 }
 
 interface SidebarNewMeterBaseProps extends Omit<ComponentPropsWithoutRef<'div'>, 'children'> {
-  /** Short name for the measured thing, e.g. `Credits`. Hidden on a collapsed rail. */
   label: ReactNode;
-  /** The figure itself. Rendered with tabular figures so it cannot shift width. */
   value: ReactNode;
-  /** One line under the value. Truncates; the card height never changes. */
   status?: ReactNode;
-  /** Drives the bloom hue. `neutral` is the only tone that carries grain. */
   tone?: SidebarNewMeterTone;
-  /** Leading icon beside the label, shown only when the tone is not neutral. */
   icon?: ReactNode;
-  /** Trailing control beside the label, kept outside the card link. */
   action?: ReactNode;
-  /** Overrides the Provider-level LinkComponent. Defaults to `<a>` when neither is set. */
   LinkComponent?: LinkComponent;
-  /** Defaults to the Provider's state; pass to override. */
   state?: SidebarState;
 }
 
 type SidebarNewMeterLinkProps =
   | {
-      /** Makes the whole card navigate. The link covers the card as an overlay. */
       href: string;
-      /** Accessible name for the card link. Required whenever `href` is set. */
       linkLabel: string;
     }
   | { href?: never; linkLabel?: never };
-
 export type SidebarNewMeterProps = SidebarNewMeterBaseProps & SidebarNewMeterLinkProps;
 
 export const SidebarNewMeter = forwardRef<HTMLDivElement, SidebarNewMeterProps>(function SidebarNewMeter(
@@ -149,14 +138,14 @@ export const SidebarNewMeter = forwardRef<HTMLDivElement, SidebarNewMeterProps>(
         data-tone={tone}
         data-state={state}
         className={cn(
-          'border-border bg-background relative isolate flex items-center justify-center overflow-hidden rounded-lg border px-1 py-2',
+          'relative isolate flex items-center justify-center overflow-hidden rounded-lg border border-border bg-background px-1 py-2',
           className,
         )}
         {...props}
       >
         <Bloom tone={tone} />
         {href ? <Link href={href} className="absolute inset-0 rounded-lg" aria-label={linkLabel} /> : null}
-        <span className="text-foreground text-ui-xs pointer-events-none relative font-semibold tabular-nums">
+        <span className="text-ui-xs text-foreground pointer-events-none relative font-semibold tabular-nums">
           {value}
         </span>
       </div>
@@ -170,8 +159,8 @@ export const SidebarNewMeter = forwardRef<HTMLDivElement, SidebarNewMeterProps>(
       data-tone={tone}
       data-state={state}
       className={cn(
-        'border-border bg-background relative isolate flex flex-col justify-center overflow-hidden rounded-lg border px-3',
-        href && 'hover:bg-card transition-colors',
+        'relative isolate flex flex-col justify-center overflow-hidden rounded-lg border border-border bg-background px-3',
+        href && 'transition-colors hover:bg-card',
         className,
       )}
       style={{ height: CARD_HEIGHT }}
@@ -183,11 +172,11 @@ export const SidebarNewMeter = forwardRef<HTMLDivElement, SidebarNewMeterProps>(
       <div className="pointer-events-none relative">
         <div className="flex items-center gap-1.5">
           {tone === 'neutral' ? null : icon}
-          <span className="text-muted-foreground text-ui-sm font-medium">{label}</span>
+          <span className="text-ui-sm text-muted-foreground font-medium">{label}</span>
           {action ? <span className="pointer-events-auto">{action}</span> : null}
         </div>
 
-        <p className="text-foreground text-ui-lg mt-0.5 leading-tight font-semibold tabular-nums">{value}</p>
+        <p className="text-ui-lg text-foreground mt-0.5 leading-tight font-semibold tabular-nums">{value}</p>
 
         {status ? (
           <div className="text-ui-xs mt-1">

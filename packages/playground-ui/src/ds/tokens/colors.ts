@@ -37,10 +37,8 @@ export const Colors = {
   'sidebar-accent': 'var(--sidebar-accent)',
   selected: 'var(--selected)',
 
-  // Semantic state colors
   error: 'var(--error)',
 
-  // Overlay colors
   overlay: 'var(--overlay)',
 };
 
