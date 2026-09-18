@@ -281,8 +281,7 @@ function ExperimentResultPanelBody({
             <Button
               size="sm"
               variant="ghost"
-              as={Link}
-              to={experimentLink}
+              render={<Link href={experimentLink} />}
               tooltip="See experiment"
               aria-label="See experiment"
             >
