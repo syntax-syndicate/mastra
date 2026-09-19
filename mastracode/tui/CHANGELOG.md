@@ -1,5 +1,71 @@
 # mastracode
 
+## 0.41.0-alpha.8
+
+### Patch Changes
+
+- Rotate OAuth accounts automatically on eligible request failures. When the active account is rate-limited, quota-exhausted, or fails authentication after one forced token refresh, Mastra Code activates the next account in the pool and retries the request. Server errors and outages exhaust the transient retry budget first and then surface without another account being activated. Every switch appears in the transcript as a one-line notice and is persisted in thread history. ([#23711](https://github.com/mastra-ai/mastra/pull/23711))
+
+  Add accounts through the TUI — `/login` on an already-connected provider offers **Add another account**:
+
+  ```text
+  /login
+    → Add another account        # completes OAuth, returns to the manager
+    → (submenu) Set as active    # optional; rotation happens on demand anyway
+  ```
+
+  No configuration is needed beyond having two or more accounts for a provider; rotation walks the provider's accounts in insertion order, starting from the account the pool is currently on.
+
+- Added multiple OAuth accounts per provider. Sign in with as many accounts per provider as you like. Running `/login` on an already-connected provider opens an account manager. There you can add another account, switch the active one, re-authenticate, or remove accounts. Added accounts stay inactive until you select one. Accounts carry labels — email for ChatGPT/xAI, GitHub login for Copilot. Credentials keep the same `auth.json` slot format, so existing setups are untouched. ([#23709](https://github.com/mastra-ai/mastra/pull/23709))
+
+  Account ids are assigned once, when an account is first registered, and no longer derived from the refresh token — so refreshing a token or re-authenticating an account no longer changes which account it is, and adding an account you already have updates it instead of registering a duplicate for the same subscription. Existing `auth.json` files are read as-is; registered accounts additionally learn their provider's stable account identifier on next load, where the provider exposes one.
+
+  Add and select accounts from `/login`:
+
+  ```text
+  /login               # choose a provider you are already signed in to
+  Add another account  # sign in again; the new account is registered but inactive
+  Set as active        # make an added account the one new requests use
+  ```
+
+- Added fallback model packs and pack-specific subscription routing. In `/models`, you can configure a fallback chain and choose the OAuth account each model in a pack uses. A selected account is used **exclusively** for that model: if it fails, the request moves to the pack's fallback chain instead of another account, so a heavy model cannot spend a second subscription's quota. `Automatic` keeps rotating through the provider's accounts in insertion order, starting from the account the pool is currently on, and a fallback pack applies its own routing. Pack hops remain visible in the transcript and persist when you reopen the thread. ([#23725](https://github.com/mastra-ai/mastra/pull/23725))
+
+  Configure both from `/models` — select a pack, then:
+
+  ```
+  /models
+    → Set fallback…            # choose the pack to hop to when this pool is exhausted
+    → Set subscription routing… # per model: pin one account, or Automatic
+  ```
+
+  Custom packs can also define an observational memory model. When set, the OM observer and reflector resolve from the active pack and its fallback chain — so OM keeps working when a pack's provider is down. Packs without an OM model keep using your standalone OM configuration, and explicit `/om` overrides still win.
+
+  Both settings live in `settings.json` if you prefer to edit them directly:
+
+  ```json
+  {
+    "customModelPacks": [
+      {
+        "name": "Daily",
+        "models": {
+          "build": "anthropic/claude-sonnet-4-6",
+          "memory": "anthropic/claude-haiku-4-5"
+        }
+      }
+    ],
+    "models": {
+      "packFallbacks": { "custom:Daily": "anthropic" },
+      "packAccountPreferences": {
+        "custom:Daily": { "anthropic/claude-sonnet-4-6": "anthropic:a1b2c3d4" }
+      }
+    }
+  }
+  ```
+
+- Updated dependencies [[`2e68388`](https://github.com/mastra-ai/mastra/commit/2e68388d003347fa3276a3985cb7f5a9c0b41f82), [`d21aa84`](https://github.com/mastra-ai/mastra/commit/d21aa84aac0dc61bbc43434af7a3b3180373a8a7), [`a0fbeab`](https://github.com/mastra-ai/mastra/commit/a0fbeabf6298854bcc6d64c8b31530bedd1ea934), [`79385bb`](https://github.com/mastra-ai/mastra/commit/79385bbd8a52ed5e5536b16190dd8b8ac1ee0840), [`5014bf6`](https://github.com/mastra-ai/mastra/commit/5014bf6a52f04304c30b4e572df4052085e3ac02), [`38368c1`](https://github.com/mastra-ai/mastra/commit/38368c18b49f08d90223431226ce33baf644fc57), [`fc1e4f2`](https://github.com/mastra-ai/mastra/commit/fc1e4f2d4e0c1caa9d29de02f7be6a7d69ee2ea2), [`58c88c4`](https://github.com/mastra-ai/mastra/commit/58c88c4e58504176ccb06d52df9440105aca788d), [`fc1e4f2`](https://github.com/mastra-ai/mastra/commit/fc1e4f2d4e0c1caa9d29de02f7be6a7d69ee2ea2), [`aee580d`](https://github.com/mastra-ai/mastra/commit/aee580d98976560e68e401c36790ce0cc6443aad), [`7c73bac`](https://github.com/mastra-ai/mastra/commit/7c73baccc8336a4fb0db92614bf778bae5459e24)]:
+  - @mastra/code-sdk@1.8.0-alpha.8
+  - @mastra/core@1.68.0-alpha.8
+
 ## 0.41.0-alpha.7
 
 ### Patch Changes

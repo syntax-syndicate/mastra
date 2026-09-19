@@ -1,5 +1,33 @@
 # @mastra/core
 
+## 1.68.0-alpha.8
+
+### Minor Changes
+
+- Added sandbox start options forwarding so providers can support cancellable startup operations. ([#24451](https://github.com/mastra-ai/mastra/pull/24451))
+
+### Patch Changes
+
+- Fixed claimed thread owners acting on a redelivered idle signal twice. A signal that a PubSub backend redelivers is now handled once while the runtime still remembers its request id, so it no longer queues the turn again or starts a second run for the same run id. If the reply to the caller never reached the backend, the redelivery re-sends it instead of reprocessing the signal. ([#24467](https://github.com/mastra-ai/mastra/pull/24467))
+
+- Fixed structured output fallback instructions to include the requested JSON schema. ([#24457](https://github.com/mastra-ai/mastra/pull/24457))
+
+- **`createCodingAgent` now repairs recoverable bad requests instead of replaying them.** ([#24469](https://github.com/mastra-ai/mastra/pull/24469))
+
+  The default error processors ran the blind stream retry first. It claims these rejections, so a request that `ProviderHistoryCompat` or `PrefillErrorHandler` knows how to fix was retried unchanged, earned the same rejection, and surfaced as a failed turn. Both repair processors now run ahead of it.
+
+  What changes for you: a coding agent hitting a malformed tool-call id or an assistant-prefill rejection now retries a corrected request rather than an identical one. The retry budget is unchanged.
+
+  Pass your own `errorProcessors` to opt out; the default list is only used when you pass none.
+
+- Fixed invalid model timeout settings being silently ignored. ([#24463](https://github.com/mastra-ai/mastra/pull/24463))
+
+- Fixed fallback models restarting from the primary model between agent tool-call steps. ([#23725](https://github.com/mastra-ai/mastra/pull/23725))
+
+- Fixed agent thread streams and durable stream adapters leaving PubSub deliveries unacknowledged. Every delivered event is now acknowledged once handled, so persistent backends like Redis Streams or GCP Pub/Sub no longer accumulate pending messages on these subscriptions. ([#24462](https://github.com/mastra-ai/mastra/pull/24462))
+
+- Fixed structured output failures to preserve validation errors and raw invalid model output for diagnostics. ([#24465](https://github.com/mastra-ai/mastra/pull/24465))
+
 ## 1.68.0-alpha.7
 
 ### Minor Changes
