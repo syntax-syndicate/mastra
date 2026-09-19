@@ -1252,9 +1252,12 @@ export function createLLMExecutionStep<TOOLS extends ToolSet = ToolSet, OUTPUT =
       // consecutive tool-only turns are not collapsed into a single block
       // by convertToModelMessages. This ensures the LLM sees them as
       // sequential steps rather than parallel tool calls.
-      if (currentIteration > 1) {
-        messageList.stepStart();
-      }
+      // Held for the rollback below: it identifies *this* iteration's boundary, which
+      // "the last step-start part" does not — markers are also synthesized within a single
+      // response when a tool call is followed by text, and nothing stored tells them apart.
+      // Undefined on the first iteration, and on any iteration with no open assistant message to
+      // append to — both roll the message back whole, which is what the rejection means there.
+      const iterationBoundary = currentIteration > 1 ? messageList.openStepBoundary().boundary : undefined;
 
       let currentMessageId = inputData.isTaskCompleteCheckFailed
         ? `${messageIdPassed}-${currentIteration}`
@@ -2589,11 +2592,17 @@ export function createLLMExecutionStep<TOOLS extends ToolSet = ToolSet, OUTPUT =
         }),
       );
 
-      // Remove rejected response messages from the messageList before the next iteration.
+      // Remove the rejected response from the messageList before the next iteration.
       // Without this, the LLM sees the rejected assistant response in its prompt on retry,
       // which confuses models and often causes empty text responses.
+      //
+      // Scoped to the rejected step, not the whole message: the response message id is stable
+      // across retry iterations, so removing the message outright also destroyed the reasoning
+      // and tool-invocation parts of steps the processor already accepted. That left a persisted
+      // assistant message carrying an OpenAI text itemId with no reasoning item to pair with,
+      // which OpenAI rejects with a non-retryable 400 on the next turn (issue #22291).
       if (shouldRetry) {
-        messageList.removeByIds([outputStream.messageId]);
+        messageList.rollbackToStepBoundary(outputStream.messageId, iterationBoundary);
       }
 
       const retryFeedbackText =
