@@ -301,6 +301,13 @@ vi.mock('../auth/storage.js', () => ({
     }
     loadStoredApiKeysIntoEnv() {}
   },
+  getOAuthProviders: () => [
+    { id: 'anthropic' },
+    { id: 'openai-codex' },
+    { id: 'github-copilot' },
+    { id: 'kimi-for-coding' },
+    { id: 'xai' },
+  ],
 }));
 
 vi.mock('../hooks/index.js', () => ({
@@ -1254,11 +1261,12 @@ describe('createMastraCode', () => {
     const agentConfig = agentConstructorMock.mock.calls
       .map(call => call[0] as { errorProcessors?: Array<{ id?: string }>; maxProcessorRetries?: number } | undefined)
       .find(config => config?.errorProcessors?.some(processor => processor.id === 'stream-error-retry-processor'));
-    expect(agentConfig?.maxProcessorRetries).toBe(10);
+    expect(agentConfig?.maxProcessorRetries).toBe(64);
     expect(agentConfig?.errorProcessors?.map(processor => processor.id)).toEqual([
       'provider-history-compat',
       'stream-error-retry-processor',
       'prefill-error-handler',
+      'mastracode-account-rotation',
     ]);
   });
 
@@ -1325,9 +1333,57 @@ describe('createMastraCode', () => {
     expect(typeof serverErrorPolicy.match).toBe('function');
     expect(serverErrorPolicy.match!(new Error('Server error. The API may be experiencing issues.'))).toBe(true);
     expect(serverErrorPolicy.match!(Object.assign(new Error('Bad gateway'), { status: 502 }))).toBe(true);
+    // Gateway timeouts (504) exhaust the transient budget before the
+    // account-rotation processor may classify them as a persistent outage.
+    expect(serverErrorPolicy.match!(Object.assign(new Error('Gateway timeout'), { statusCode: 504 }))).toBe(true);
+    expect(serverErrorPolicy.match!(Object.assign(new Error('Server error'), { statusCode: 500 }))).toBe(true);
     expect(serverErrorPolicy.maxRetries).toBe(10);
     expect(serverErrorPolicy.delayMs!({ retryCount: 0 })).toBe(500);
     expect(typeof serverErrorPolicy.onRetry).toBe('function');
+  });
+
+  it('registers account rotation in the error lane after stream error retries, and the start notice in the input lane only', async () => {
+    const { createMastraCode } = await import('../index.js');
+
+    await createMastraCode();
+
+    expect(agentConstructorMock).toHaveBeenCalled();
+    const agentConfig = agentConstructorMock.mock.calls
+      .map(call => call[0] as { errorProcessors?: Array<{ id?: string }>; inputProcessors?: unknown } | undefined)
+      .find(config => config?.errorProcessors?.some(processor => processor.id === 'mastracode-account-rotation'));
+
+    const errorLane = agentConfig?.errorProcessors?.map(processor => processor.id) ?? [];
+    expect(errorLane.indexOf('mastracode-account-rotation')).toBeGreaterThan(
+      errorLane.indexOf('stream-error-retry-processor'),
+    );
+
+    const inputLane = resolveInputProcessors() as Array<{ id?: string; processAPIError?: unknown }>;
+    const startNotice = inputLane.find(processor => processor.id === 'mastracode-account-start-notice');
+    expect(startNotice).toBeDefined();
+    // Load-bearing: an input-lane processAPIError would run BEFORE
+    // StreamErrorRetryProcessor (runProcessAPIError walks input → output →
+    // error lanes) and rotate on errors transient retries should own.
+    expect(startNotice!.processAPIError).toBeUndefined();
+  });
+
+  it('sets a finite shared retry ceiling with headroom for large account pools', async () => {
+    const { createMastraCode } = await import('../index.js');
+
+    await createMastraCode();
+
+    const agentConfig = agentConstructorMock.mock.calls
+      .map(call => call[0] as { maxProcessorRetries?: number } | undefined)
+      .find(config => typeof config?.maxProcessorRetries === 'number');
+    const budget = agentConfig?.maxProcessorRetries;
+    // Bounded on purpose: core counts every processor-requested retry against
+    // this one number, so an open-ended budget lets a custom or plugin
+    // processor amplify a single request indefinitely.
+    expect(budget).toBe(64);
+    expect(Number.isSafeInteger(budget)).toBe(true);
+
+    // Sized for the largest legitimate cascade: one rotation step per remaining
+    // account per pack hop (8 representative accounts x 8 packs).
+    expect(budget!).toBeGreaterThanOrEqual(8 * 8);
   });
 
   it('prepends embedding input processors without replacing mandatory built-ins', async () => {
@@ -1347,6 +1403,7 @@ describe('createMastraCode', () => {
       'plan-rejection-abort',
       'agents-md-injector',
       'provider-history-compat',
+      'mastracode-account-start-notice',
     ]);
     expect(resolveOutputProcessors()).toEqual([]);
   });
@@ -1404,6 +1461,7 @@ describe('createMastraCode', () => {
       'plan-rejection-abort',
       'agents-md-injector',
       'provider-history-compat',
+      'mastracode-account-start-notice',
       'acme-input',
     ]);
     expect(resolveOutputProcessors()).toEqual([pluginOutput]);
@@ -1416,6 +1474,7 @@ describe('createMastraCode', () => {
       'plan-rejection-abort',
       'agents-md-injector',
       'provider-history-compat',
+      'mastracode-account-start-notice',
     ]);
     expect(resolveOutputProcessors()).toEqual([]);
   });
@@ -1459,6 +1518,7 @@ describe('createMastraCode', () => {
       'plan-rejection-abort',
       'agents-md-injector',
       'provider-history-compat',
+      'mastracode-account-start-notice',
       'acme-provider-input',
     ]);
     expect(resolveOutputProcessors()).toEqual([outputProcessor]);
@@ -1524,6 +1584,7 @@ describe('createMastraCode', () => {
       'plan-rejection-abort',
       'agents-md-injector',
       'provider-history-compat',
+      'mastracode-account-start-notice',
     ]);
     expect(resolveOutputProcessors()).toEqual([]);
     // Warned once, not once per request: this is the hot path.
