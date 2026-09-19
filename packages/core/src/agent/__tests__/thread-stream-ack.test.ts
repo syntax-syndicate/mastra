@@ -212,3 +212,136 @@ describe('claimed thread ownership acknowledges every delivery', () => {
     });
   });
 });
+
+/**
+ * Learns the runtime's own source id. An idle signal is only handled when it is
+ * addressed to that id, and the runtime never exposes it locally — the owner
+ * discovery reply is where it goes on the wire.
+ */
+async function runtimeSourceId(pubsub: LeasePubSub) {
+  const probeReplyTopic = `${OWNER_DISCOVERY_TOPIC}.source-probe`;
+  await pubsub.subscribe(probeReplyTopic, () => {});
+  await pubsub.publish(OWNER_DISCOVERY_TOPIC, {
+    type: 'thread-owner-request',
+    runId: 'source-probe',
+    data: {
+      type: 'thread-owner-request',
+      key,
+      requestId: 'source-probe',
+      replyTopic: probeReplyTopic,
+      sourceId: 'elsewhere',
+    },
+  });
+  await nextTicks();
+  const reply = deliveriesOn(pubsub, probeReplyTopic)[0];
+  return reply.event.data.sourceId as string;
+}
+
+describe('redelivered idle signals', () => {
+  const publishSignal = (pubsub: LeasePubSub, requestId: string, targetSourceId: string, replyTopic: string) =>
+    pubsub.publish(threadTopic, {
+      type: 'agent.thread-stream',
+      runId: `run-${requestId}`,
+      data: {
+        type: 'idle-signal-enqueued',
+        requestId,
+        runId: `run-${requestId}`,
+        sourceId: 'elsewhere',
+        targetSourceId,
+        replyTopic,
+        timeoutMs: 1_000,
+        signal: { type: 'user', contents: 'hello' },
+      },
+    });
+
+  it('acts on a redelivery of the same request only once', async () => {
+    const { runtime, pubsub } = setup();
+    const owner = await claim(runtime, pubsub);
+    const targetSourceId = await runtimeSourceId(pubsub);
+
+    const replyTopic = `${threadTopic}.dup-reply`;
+    // LeasePubSub only records a delivery when something is subscribed, so
+    // subscribe to the reply topic to observe the handler's response.
+    await pubsub.subscribe(replyTopic, () => {});
+
+    await publishSignal(pubsub, 'duplicate-1', targetSourceId, replyTopic);
+    await nextTicks();
+    expect(deliveriesOn(pubsub, replyTopic)).toHaveLength(1);
+
+    // The backend redelivers because the first acknowledgement never landed.
+    // Acting on it again would queue a second turn or start a second run under
+    // the same runId, and answer the caller a second time.
+    await publishSignal(pubsub, 'duplicate-1', targetSourceId, replyTopic);
+    await nextTicks();
+
+    expect(deliveriesOn(pubsub, replyTopic)).toHaveLength(1);
+    // The repeat is still acknowledged — dropping it must not strand it in the
+    // backend's pending set.
+    expect(deliveriesOn(pubsub, threadTopic).every(d => d.acked)).toBe(true);
+
+    owner.unsubscribe();
+    await nextTicks();
+  });
+
+  it('still acts on a distinct request', async () => {
+    const { runtime, pubsub } = setup();
+    const owner = await claim(runtime, pubsub);
+    const targetSourceId = await runtimeSourceId(pubsub);
+
+    const replyTopic = `${threadTopic}.distinct-reply`;
+    await pubsub.subscribe(replyTopic, () => {});
+
+    await publishSignal(pubsub, 'distinct-1', targetSourceId, replyTopic);
+    await publishSignal(pubsub, 'distinct-2', targetSourceId, replyTopic);
+    await nextTicks();
+
+    expect(deliveriesOn(pubsub, replyTopic)).toHaveLength(2);
+
+    owner.unsubscribe();
+    await nextTicks();
+  });
+
+  it('re-sends the reply on a redelivery when the first attempt never reached the backend', async () => {
+    const { runtime, pubsub } = setup();
+    // An agent that can start a run, so the handler reaches the acceptance reply
+    // rather than the rejection path.
+    let runs = 0;
+    (harness.agent as { stream?: unknown }).stream = async () => {
+      runs += 1;
+      return { text: Promise.resolve(''), runId: 'run-recovery' };
+    };
+    try {
+      const owner = await claim(runtime, pubsub);
+      const targetSourceId = await runtimeSourceId(pubsub);
+
+      const replyTopic = `${threadTopic}.reply-recovery`;
+      await pubsub.subscribe(replyTopic, () => {});
+
+      // The reply cannot reach the caller, so the delivery must not be
+      // acknowledged: the backend has to redeliver for the caller to ever learn
+      // that the signal was accepted.
+      pubsub.failPublish.add(replyTopic);
+      await expect(publishSignal(pubsub, 'recovery-1', targetSourceId, replyTopic)).rejects.toThrow(
+        `publish to ${replyTopic} failed`,
+      );
+      expect(deliveriesOn(pubsub, threadTopic).some(d => d.acked)).toBe(false);
+      expect(deliveriesOn(pubsub, replyTopic)).toHaveLength(0);
+
+      // The redelivery re-sends the reply without acting on the signal again —
+      // the caller gets its acceptance, and no second run starts.
+      pubsub.failPublish.delete(replyTopic);
+      await publishSignal(pubsub, 'recovery-1', targetSourceId, replyTopic);
+      await nextTicks();
+
+      const replies = deliveriesOn(pubsub, replyTopic);
+      expect(replies).toHaveLength(1);
+      expect(replies[0].event.data.type).toBe('idle-signal-accepted');
+      expect(runs).toBe(1);
+
+      owner.unsubscribe();
+      await nextTicks();
+    } finally {
+      delete (harness.agent as { stream?: unknown }).stream;
+    }
+  });
+});
