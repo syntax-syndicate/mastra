@@ -10,6 +10,7 @@ import { isSupportedLanguageModel, supportedLanguageModelSpecifications } from '
 import { ErrorCategory, ErrorDomain, MastraError } from '../../../error';
 import { getErrorFromUnknown } from '../../../error/utils.js';
 import type { MastraModelSettings } from '../../../llm/model/model-settings';
+import { validateModelTimeoutSettings } from '../../../llm/model/model-settings';
 import { mergeProviderOptions } from '../../../llm/model/provider-options';
 import { ModelRouterLanguageModel } from '../../../llm/model/router';
 import type { MastraLanguageModel, SharedProviderOptions } from '../../../llm/model/shared.types';
@@ -1771,6 +1772,8 @@ export function createLLMExecutionStep<TOOLS extends ToolSet = ToolSet, OUTPUT =
             },
           }) as unknown as ReturnType<typeof execute>;
         } else if (isSupportedLanguageModel(currentStep.model)) {
+          validateModelTimeoutSettings(currentStep.modelSettings?.timeout);
+
           // Apply request-side context to MODEL_INFERENCE using the post-processor
           // tool set + per-step settings, then open the inference span. Doing this
           // immediately before execute() ensures the span's startTime excludes
