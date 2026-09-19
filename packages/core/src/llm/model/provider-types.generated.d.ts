@@ -4154,6 +4154,7 @@ export type ProviderModelsMap = {
     'glm-5.2',
     'glm-5.3',
     'glm-5.3-flash',
+    'glm-5.3-flashx',
     'glm-5v-turbo',
   ];
   readonly jalapeno: readonly [
@@ -4928,6 +4929,7 @@ export type ProviderModelsMap = {
     'z-ai/glm-5.2:free',
     'z-ai/glm-5.3',
     'z-ai/glm-5.3-flash',
+    'z-ai/glm-5.3-flashx',
     'z-ai/glm-5v-turbo',
     '~anthropic/claude-fable-latest',
     '~anthropic/claude-haiku-latest',
@@ -5306,6 +5308,7 @@ export type ProviderModelsMap = {
     'deepseek-v4-flash-free',
     'deepseek-v4-flash-vision-exp',
     'deepseek-v4-pro',
+    'deepseek-v4.1-flash',
     'gemini-3-flash',
     'gemini-3-pro',
     'gemini-3.1-pro',
@@ -5387,6 +5390,7 @@ export type ProviderModelsMap = {
     'qwen3.5-plus',
     'qwen3.6-plus',
     'qwen3.6-plus-free',
+    'qwen3.8-flash',
     'ring-2.6-1t-free',
     'trinity-large-preview-free',
     'x-preview-f-free',
@@ -5780,6 +5784,7 @@ export type ProviderModelsMap = {
     'z-ai/glm-5.2:free',
     'z-ai/glm-5.3',
     'z-ai/glm-5.3-flash',
+    'z-ai/glm-5.3-flashx',
     'z-ai/glm-5v-turbo',
     '~anthropic/claude-fable-latest',
     '~anthropic/claude-haiku-latest',
@@ -6464,6 +6469,7 @@ export type ProviderModelsMap = {
     'glm-5.2',
     'glm-5.3',
     'glm-5.3-flash',
+    'glm-5.3-flashx',
     'glm-5v-turbo',
   ];
   readonly bailing: readonly ['Ling-1T', 'Ring-1T'];

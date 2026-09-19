@@ -5072,6 +5072,7 @@
         "glm-5.2",
         "glm-5.3",
         "glm-5.3-flash",
+        "glm-5.3-flashx",
         "glm-5v-turbo"
       ],
       "docUrl": "https://docs.z.ai/guides/overview/pricing",
@@ -6119,6 +6120,7 @@
         "z-ai/glm-5.2:free",
         "z-ai/glm-5.3",
         "z-ai/glm-5.3-flash",
+        "z-ai/glm-5.3-flashx",
         "z-ai/glm-5v-turbo",
         "~anthropic/claude-fable-latest",
         "~anthropic/claude-haiku-latest",
@@ -6574,6 +6576,7 @@
         "deepseek-v4-flash-free",
         "deepseek-v4-flash-vision-exp",
         "deepseek-v4-pro",
+        "deepseek-v4.1-flash",
         "gemini-3-flash",
         "gemini-3-pro",
         "gemini-3.1-pro",
@@ -6655,6 +6658,7 @@
         "qwen3.5-plus",
         "qwen3.6-plus",
         "qwen3.6-plus-free",
+        "qwen3.8-flash",
         "ring-2.6-1t-free",
         "trinity-large-preview-free",
         "x-preview-f-free"
@@ -6772,6 +6776,9 @@
         },
         "gpt-5.5-pro": {
           "npm": "@ai-sdk/openai"
+        },
+        "qwen3.8-flash": {
+          "npm": "@ai-sdk/anthropic"
         },
         "gpt-5.4-mini": {
           "npm": "@ai-sdk/openai"
@@ -7285,6 +7292,7 @@
         "z-ai/glm-5.2:free",
         "z-ai/glm-5.3",
         "z-ai/glm-5.3-flash",
+        "z-ai/glm-5.3-flashx",
         "z-ai/glm-5v-turbo",
         "~anthropic/claude-fable-latest",
         "~anthropic/claude-haiku-latest",
@@ -8477,6 +8485,7 @@
         "glm-5.2",
         "glm-5.3",
         "glm-5.3-flash",
+        "glm-5.3-flashx",
         "glm-5v-turbo"
       ],
       "docUrl": "https://docs.z.ai/guides/overview/pricing",
@@ -14246,6 +14255,7 @@
       "glm-5.2",
       "glm-5.3",
       "glm-5.3-flash",
+      "glm-5.3-flashx",
       "glm-5v-turbo"
     ],
     "jalapeno": [
@@ -15020,6 +15030,7 @@
       "z-ai/glm-5.2:free",
       "z-ai/glm-5.3",
       "z-ai/glm-5.3-flash",
+      "z-ai/glm-5.3-flashx",
       "z-ai/glm-5v-turbo",
       "~anthropic/claude-fable-latest",
       "~anthropic/claude-haiku-latest",
@@ -15389,6 +15400,7 @@
       "deepseek-v4-flash-free",
       "deepseek-v4-flash-vision-exp",
       "deepseek-v4-pro",
+      "deepseek-v4.1-flash",
       "gemini-3-flash",
       "gemini-3-pro",
       "gemini-3.1-pro",
@@ -15470,6 +15482,7 @@
       "qwen3.5-plus",
       "qwen3.6-plus",
       "qwen3.6-plus-free",
+      "qwen3.8-flash",
       "ring-2.6-1t-free",
       "trinity-large-preview-free",
       "x-preview-f-free"
@@ -15863,6 +15876,7 @@
       "z-ai/glm-5.2:free",
       "z-ai/glm-5.3",
       "z-ai/glm-5.3-flash",
+      "z-ai/glm-5.3-flashx",
       "z-ai/glm-5v-turbo",
       "~anthropic/claude-fable-latest",
       "~anthropic/claude-haiku-latest",
@@ -16547,6 +16561,7 @@
       "glm-5.2",
       "glm-5.3",
       "glm-5.3-flash",
+      "glm-5.3-flashx",
       "glm-5v-turbo"
     ],
     "bailing": ["Ling-1T", "Ring-1T"],
