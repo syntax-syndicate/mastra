@@ -109,6 +109,38 @@ describe('getAssistantRenderParts', () => {
     expect(accountSwitchNoticeText(parts[0] as never)).not.toMatch(/unavailable/);
   });
 
+  it('re-renders a persisted pinned-account exhaustion as pinned, not the whole pool', () => {
+    const message = assistantMessage([
+      {
+        type: 'data-mastracode-account-switch',
+        data: {
+          provider: 'kimi-for-coding',
+          from: { id: 'kimi-for-coding:bbbb', label: 'Personal' },
+          to: null,
+          reason: 'pool-exhausted',
+          at: '2026-09-17T00:00:00.000Z',
+          exclusive: true,
+        },
+      } as never,
+    ]);
+
+    const parts = getAssistantRenderParts(message);
+    // The flag must survive history parsing: dropping it would re-render a
+    // route that consulted one account as if the pool had been walked (A12).
+    expect(parts).toEqual([
+      {
+        kind: 'account-switch',
+        provider: 'kimi-for-coding',
+        from: { id: 'kimi-for-coding:bbbb', label: 'Personal' },
+        to: null,
+        reason: 'pool-exhausted',
+        at: '2026-09-17T00:00:00.000Z',
+        exclusive: true,
+      },
+    ]);
+    expect(accountSwitchNoticeText(parts[0] as never)).toBe('Pinned Kimi account unavailable (pool exhausted)');
+  });
+
   it('keeps an explicit null to endpoint rendering as pool exhaustion', () => {
     const message = assistantMessage([
       {
@@ -135,6 +167,51 @@ describe('getAssistantRenderParts', () => {
       },
     ]);
   });
+
+  it('drops a persisted pack-fallback part whose reason is not a pack-fallback reason', () => {
+    const message = assistantMessage([
+      {
+        type: 'data-mastracode-pack-fallback',
+        data: {
+          from: { packId: 'custom:Daily', label: 'Daily' },
+          to: { packId: 'anthropic', label: 'Anthropic' },
+          // A valid *account-switch* reason that this part must not accept —
+          // `packFallbackNoticeText` would render it as "rate limit".
+          reason: 'rate-limit',
+          at: '2026-09-17T00:00:00.000Z',
+        },
+      } as never,
+    ]);
+
+    expect(getAssistantRenderParts(message)).toEqual([]);
+  });
+
+  it.each(['pool-exhausted', 'persistent-outage'] as const)(
+    'keeps a persisted pack-fallback part with reason %s',
+    reason => {
+      const message = assistantMessage([
+        {
+          type: 'data-mastracode-pack-fallback',
+          data: {
+            from: { packId: 'custom:Daily', label: 'Daily' },
+            to: { packId: 'anthropic', label: 'Anthropic' },
+            reason,
+            at: '2026-09-17T00:00:00.000Z',
+          },
+        } as never,
+      ]);
+
+      expect(getAssistantRenderParts(message)).toEqual([
+        {
+          kind: 'pack-fallback',
+          from: { packId: 'custom:Daily', label: 'Daily' },
+          to: { packId: 'anthropic', label: 'Anthropic' },
+          reason,
+          at: '2026-09-17T00:00:00.000Z',
+        },
+      ]);
+    },
+  );
 
   it('maps a reasoning part to a thinking render item', () => {
     const message = assistantMessage([{ type: 'reasoning', reasoning: 'why', details: [] } as never]);

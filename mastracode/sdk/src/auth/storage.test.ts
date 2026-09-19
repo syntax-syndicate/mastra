@@ -243,6 +243,56 @@ describe('AuthStorage multi-account registry', () => {
     expect(accounts[0]).toMatchObject({ access: 'a1', refresh: 'r1' });
   });
 
+  it('addAccount with activate:false appends without touching the active account or slot', async () => {
+    const { storage } = makeStorage();
+
+    await storage.addAccount(PROVIDER, { refresh: 'r1', access: 'a1', expires: FUTURE }, { label: 'Work' });
+    const added = await storage.addAccount(
+      PROVIDER,
+      { refresh: 'r2', access: 'a2', expires: FUTURE },
+      { activate: false },
+    );
+
+    expect(added).toMatchObject({ refresh: 'r2', active: false });
+    const accounts = storage.listAccounts(PROVIDER);
+    expect(accounts).toHaveLength(2);
+    expect(accounts[0]).toMatchObject({ refresh: 'r1', active: true });
+    expect(accounts[1]).toMatchObject({ refresh: 'r2', active: false });
+    // Slot still holds the first (active) account's tokens; the new account's
+    // tokens live only in its entry.
+    expect(storage.get(PROVIDER)).toMatchObject({ type: 'oauth', refresh: 'r1', access: 'a1' });
+  });
+
+  it("addAccount with activate:false still activates the provider's first account", async () => {
+    const { storage } = makeStorage();
+
+    const added = await storage.addAccount(
+      PROVIDER,
+      { refresh: 'r1', access: 'a1', expires: FUTURE },
+      { activate: false },
+    );
+
+    expect(added.active).toBe(true);
+    expect(storage.getActiveAccount(PROVIDER)?.refresh).toBe('r1');
+    expect(storage.get(PROVIDER)).toMatchObject({ refresh: 'r1', access: 'a1' });
+  });
+
+  it('addAccount with activate:false on the already-active entry still moves fresh tokens into the slot', async () => {
+    const { storage } = makeStorage();
+    await storage.addAccount(PROVIDER, { refresh: 'r1', access: 'a1', expires: FUTURE });
+    await storage.addAccount(PROVIDER, { refresh: 'r2', access: 'a2', expires: FUTURE }, { activate: false });
+
+    // Re-auth of the active account through the plain add path (same refresh
+    // token): entry updated in place, active kept, slot gets the new tokens.
+    await storage.addAccount(PROVIDER, { refresh: 'r1', access: 'a1-new', expires: FUTURE }, { activate: false });
+
+    const accounts = storage.listAccounts(PROVIDER);
+    expect(accounts).toHaveLength(2);
+    expect(accounts[0]).toMatchObject({ refresh: 'r1', access: 'a1-new', active: true });
+    expect(accounts[1]).toMatchObject({ refresh: 'r2', active: false });
+    expect(storage.get(PROVIDER)).toMatchObject({ refresh: 'r1', access: 'a1-new' });
+  });
+
   it('addAccount with a colliding id updates tokens in place (re-authentication path)', async () => {
     const { storage } = makeStorage();
     await storage.addAccount(PROVIDER, { refresh: 'r1', access: 'a1', expires: FUTURE }, { label: 'Work' });
@@ -389,6 +439,45 @@ describe('AuthStorage multi-account registry', () => {
       refresh: 'r1-forced',
       access: 'a1-forced',
     });
+  });
+
+  it('reads and refreshes a selected account without changing the active account', async () => {
+    const entry1 = accountRecord('r1', 'a1', { active: true });
+    const entry2 = accountRecord('r2', 'a2', { expires: PAST });
+    const { storage } = makeStorage({
+      [PROVIDER]: oauthCred('r1', 'a1'),
+      [`accounts:${entry1.id}`]: entry1,
+      [`accounts:${entry2.id}`]: entry2,
+    });
+    const refreshMock = vi.spyOn(anthropicOAuthProvider, 'refreshToken').mockResolvedValue({
+      refresh: 'r2-fresh',
+      access: 'a2-fresh',
+      expires: FUTURE,
+    });
+
+    await expect(storage.getApiKey(PROVIDER, entry2.id)).resolves.toBe('a2-fresh');
+    await expect(storage.getOAuthCredential(PROVIDER, entry2.id)).resolves.toMatchObject({
+      access: 'a2-fresh',
+      accountInstanceId: entry2.id,
+    });
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+    expect(storage.getActiveAccount(PROVIDER)?.id).toBe(entry1.id);
+    expect(storage.get(PROVIDER)).toMatchObject({ access: 'a1' });
+  });
+
+  it('A12: a request pinned to an account is never served the provider slot API key', async () => {
+    // A provider slot holding an API key with no registry: the shape a
+    // legacy/hand-edited auth.json can leave behind. `migrate()` only rewrites
+    // the slot when the provider has a registered account, so this state
+    // survives load.
+    const { storage } = makeStorage({ [PROVIDER]: { type: 'api_key', key: 'sk-ant-provider-wide' } });
+
+    // Unpinned callers keep the legacy provider-slot behaviour.
+    await expect(storage.getApiKey(PROVIDER)).resolves.toBe('sk-ant-provider-wide');
+    // A request whose selected account no longer resolves (removed between
+    // routing and the credential read) fails closed instead of being handed
+    // the provider-wide key.
+    await expect(storage.getApiKey(PROVIDER, `${PROVIDER}:someone-else`)).resolves.toBeUndefined();
   });
 
   it('dedupes concurrent refreshes per instance', async () => {
@@ -693,6 +782,42 @@ describe('AuthStorage multi-account registry', () => {
     expect(slot).toMatchObject({ type: 'oauth', access: accountB.access ?? 'ka2', refresh: 'kr2' });
     expect(slot?.deviceId).toBeUndefined();
     expect(slot?.enterpriseUrl).toBeUndefined();
+  });
+
+  it('prefers the legacy slot for the active account when a legacy writer refreshed it', async () => {
+    const { storage, authPath } = makeStorage();
+    await storage.addAccount(PROVIDER, { refresh: 'r1', access: 'a1', expires: FUTURE }, { label: 'Work' });
+    const work = storage.getActiveAccount(PROVIDER)!;
+
+    // An older build (or another worktree) refreshes the provider slot without
+    // rotating the refresh token, so `migrate()`'s token-change branch never
+    // reconciles the registry entry. The registry then holds stale access/expiry
+    // while the slot holds the live token.
+    const onDisk = readAuthJson(authPath);
+    onDisk[PROVIDER] = { type: 'oauth', refresh: 'r1', access: 'a1-slot-fresh', expires: FUTURE + 1 };
+    writeFileSync(authPath, JSON.stringify(onDisk), 'utf-8');
+
+    const snapshot = await storage.getOAuthCredential(PROVIDER, work.id);
+
+    // Slot credentials, registry identity.
+    expect(snapshot).toMatchObject({ access: 'a1-slot-fresh', accountInstanceId: work.id });
+  });
+
+  it('keeps registry credentials for an inactive selected account', async () => {
+    const { storage } = makeStorage();
+    await storage.addAccount(PROVIDER, { refresh: 'r1', access: 'a1', expires: FUTURE }, { label: 'Work' });
+    const personal = await storage.addAccount(
+      PROVIDER,
+      { refresh: 'r2', access: 'a2', expires: FUTURE },
+      { label: 'Personal', activate: false },
+    );
+
+    // The slot carries Work's tokens; the inactive selection must not pick them
+    // up — that would send Personal's request with Work's credential.
+    await expect(storage.getOAuthCredential(PROVIDER, personal.id)).resolves.toMatchObject({
+      access: 'a2',
+      accountInstanceId: personal.id,
+    });
   });
 
   it('logout removes the slot and every registered account', async () => {
