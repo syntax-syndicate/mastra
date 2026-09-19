@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { getErrorFromUnknown } from '../error';
+import { withAck } from '../events/acking-callback';
 import { EventEmitterPubSub } from '../events/event-emitter';
 import { isLeaseProvider, NoopLeaseProvider } from '../events/pubsub';
 import type { LeaseProvider, PubSub } from '../events/pubsub';
@@ -781,7 +782,7 @@ export class AgentThreadStreamRuntime {
 
     let active = false;
 
-    const onEvent: EventCallback = async event => {
+    const onEvent: EventCallback = withAck(async event => {
       if (!active) return;
       const data = event.data as AgentThreadStreamRuntimeEvent | undefined;
       if (data?.type !== 'idle-signal-enqueued' || data.sourceId === sourceId || data.targetSourceId !== sourceId) {
@@ -849,29 +850,34 @@ export class AgentThreadStreamRuntime {
           });
         }
       }
-    };
+    });
 
-    const onOwnerDiscovery: EventCallback = event => {
+    // Both discovery handlers await their reply before returning, so the request is only
+    // acked once the reply publish has settled. Acking first would let a failed publish lose
+    // the request — the backend sees it as handled and cannot redeliver, leaving the caller's
+    // `#deliverAfterClaimedOwnerDiscovery` to throw with no response. Awaiting keeps the ack
+    // behind the publish and lets a rejection reach the nack path, matching `onEvent`.
+    const onOwnerDiscovery: EventCallback = withAck(async event => {
       if (!active) return;
       const data = event.data as AgentThreadOwnerDiscoveryEvent | undefined;
       if (data?.type !== 'thread-owner-request' || data.key !== key || data.sourceId === sourceId) return;
-      void resolvedPubSub.publish(data.replyTopic, {
+      await resolvedPubSub.publish(data.replyTopic, {
         type: 'thread-owner-response',
         runId: data.requestId,
         data: { type: 'thread-owner-response', key, requestId: data.requestId, sourceId },
       });
-    };
+    });
 
-    const onPeerDiscovery: EventCallback = event => {
+    const onPeerDiscovery: EventCallback = withAck(async event => {
       if (!active || !peer) return;
       const data = event.data as AgentThreadPeerDiscoveryEvent | undefined;
       if (data?.type !== 'thread-peer-request' || data.sourceId === sourceId) return;
-      void resolvedPubSub.publish(data.replyTopic, {
+      await resolvedPubSub.publish(data.replyTopic, {
         type: 'thread-peer-response',
         runId: data.requestId,
         data: { type: 'thread-peer-response', requestId: data.requestId, peer: toPublicThreadPeer(peer), sourceId },
       });
-    };
+    });
 
     let threadSubscribed = false;
     let ownerDiscoverySubscribed = false;
@@ -977,11 +983,11 @@ export class AgentThreadStreamRuntime {
         resolve();
         void resolvedPubSub.unsubscribe(replyTopic, onReply).catch(() => {});
       };
-      const onReply: EventCallback = event => {
+      const onReply: EventCallback = withAck(event => {
         const data = event.data as AgentThreadPeerDiscoveryEvent | undefined;
         if (data?.type !== 'thread-peer-response' || data.requestId !== requestId) return;
         peers.set(data.peer.id, { ...data.peer, sourceId: data.sourceId, discoveredAt: new Date() });
-      };
+      });
       const timeout = setTimeout(finish, options.timeoutMs ?? AGENT_THREAD_PEER_DISCOVERY_TIMEOUT_MS);
 
       void resolvedPubSub
@@ -1142,7 +1148,7 @@ export class AgentThreadStreamRuntime {
         else resolve(result.runId);
         void pubsub.unsubscribe(replyTopic, onReply).catch(() => {});
       };
-      const onReply: EventCallback = event => {
+      const onReply: EventCallback = withAck(event => {
         const data = event.data as AgentThreadIdleSignalAcceptanceEvent | undefined;
         if (!data || data.requestId !== requestId || data.sourceId !== targetSourceId) return;
         if (data.type === 'idle-signal-rejected') {
@@ -1152,7 +1158,7 @@ export class AgentThreadStreamRuntime {
         if (data.type === 'idle-signal-accepted') {
           finish({ runId: data.runId });
         }
-      };
+      });
       const timeout = setTimeout(
         () => finish({ error: new Error(`Claimed thread owner did not accept signal for ${key}`) }),
         AGENT_THREAD_OWNER_ACCEPTANCE_TIMEOUT_MS,
@@ -1219,12 +1225,12 @@ export class AgentThreadStreamRuntime {
         resolve(sourceId);
         void pubsub.unsubscribe(replyTopic, onReply).catch(() => {});
       };
-      const onReply: EventCallback = event => {
+      const onReply: EventCallback = withAck(event => {
         const data = event.data as AgentThreadOwnerDiscoveryEvent | undefined;
         if (data?.type === 'thread-owner-response' && data.key === key && data.requestId === requestId) {
           finish(data.sourceId);
         }
-      };
+      });
       const timeout = setTimeout(() => finish(), AGENT_THREAD_OWNER_DISCOVERY_TIMEOUT_MS);
 
       void pubsub
