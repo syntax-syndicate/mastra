@@ -50,6 +50,8 @@ const JIRA_STATUS_URL = `${TEST_BASE_URL}/web/jira/status`;
 const JIRA_PROJECTS_URL = `${TEST_BASE_URL}/web/jira/projects`;
 const JIRA_CONNECT_SESSION_URL = `${TEST_BASE_URL}/web/integrations/platform/jira/connect-session`;
 const JIRA_CONNECTIONS_URL = `${TEST_BASE_URL}/web/integrations/platform/jira/connections`;
+const INCIDENTIO_CONNECTIONS_URL = `${TEST_BASE_URL}/web/integrations/platform/incident-io/connections`;
+const INTAKE_SOURCES_URL = `${TEST_BASE_URL}/web/intake/sources`;
 
 /**
  * Stub the platform connect seam: session minting plus the connection list
@@ -93,6 +95,7 @@ function baseConfig(): IntakeConfig {
     github: { enabled: true, sourceIds: null },
     linear: { enabled: true, sourceIds: null },
     jira: { enabled: false, sourceIds: null },
+    incidentio: { enabled: false, sourceIds: null },
   };
 }
 
@@ -228,6 +231,65 @@ function useJiraHandlers({
   return { saved, savedBindings };
 }
 
+function useIncidentioHandlers({
+  config = { ...baseConfig(), incidentio: { enabled: true, sourceIds: ['incidentio-source:follow-ups'] } },
+  bindings = [],
+}: { config?: IntakeConfig; bindings?: IntakeSourceBinding[] } = {}) {
+  const saved = useIntakeHandlers({ config });
+  const savedBindings: Array<{
+    integrationId: string;
+    sourceId: string;
+    factoryProjectId: string | null;
+    board: string | null;
+  }> = [];
+  server.use(
+    http.get(INCIDENTIO_CONNECTIONS_URL, () =>
+      HttpResponse.json({
+        connections: [
+          {
+            id: 'incidentio-acme',
+            integrationId: 'incident-io',
+            status: 'active',
+            accountLabel: 'acme',
+          },
+        ],
+      }),
+    ),
+    http.get(INTAKE_SOURCES_URL, () =>
+      HttpResponse.json({
+        sources: [
+          {
+            integrationId: 'incidentio',
+            id: 'incidentio-source:incidents',
+            name: 'Incidents (acme)',
+            type: 'incident',
+          },
+          {
+            integrationId: 'incidentio',
+            id: 'incidentio-source:follow-ups',
+            name: 'Incident follow-ups (acme)',
+            type: 'follow-up',
+          },
+        ],
+        failures: [],
+      }),
+    ),
+    http.get(BINDINGS_URL, () => HttpResponse.json({ bindings })),
+    http.put(BINDINGS_URL, async ({ request }) => {
+      const body = (await request.json()) as {
+        integrationId: string;
+        sourceId: string;
+        factoryProjectId: string | null;
+        board: string | null;
+      };
+      savedBindings.push(body);
+      const next = body.factoryProjectId === null ? [] : [body as IntakeSourceBinding];
+      return HttpResponse.json({ bindings: next });
+    }),
+  );
+  return { saved, savedBindings };
+}
+
 function seedFactories() {
   server.use(
     http.get(`${TEST_BASE_URL}/web/factory/projects`, () =>
@@ -294,6 +356,7 @@ describe('IntakeSection', () => {
           github: { enabled: true, sourceIds: ['mastra'] },
           linear: { enabled: true, sourceIds: ['lproj-1'] },
           jira: { enabled: false, sourceIds: null },
+          incidentio: { enabled: false, sourceIds: null },
         },
       });
 
@@ -445,6 +508,7 @@ describe('IntakeSection', () => {
           github: { enabled: true, sourceIds: null },
           linear: { enabled: true, sourceIds: ['linear-team:opaque-eng', 'lproj-1'] },
           jira: { enabled: false, sourceIds: null },
+          incidentio: { enabled: false, sourceIds: null },
         },
       });
 
@@ -765,6 +829,95 @@ describe('IntakeSection', () => {
       ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Reconnect Jira' })).toBeInTheDocument();
       expect(screen.queryByRole('group', { name: 'Jira projects' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('given the incident.io Platform connect route is mounted', () => {
+    it('collects an API key in a dialog and submits it without a popup', async () => {
+      useIntakeHandlers();
+      const connections: Array<{
+        id: string;
+        integrationId: string;
+        status: string;
+        accountLabel: string | null;
+      }> = [];
+      server.use(
+        http.get(`${TEST_BASE_URL}/web/integrations/platform/incident-io/connections`, () =>
+          HttpResponse.json({ connections }),
+        ),
+        http.post(`${TEST_BASE_URL}/web/integrations/platform/incident-io/connect-session`, () => {
+          connections.push({ id: 'inc-1', integrationId: 'incident-io', status: 'active', accountLabel: 'Acme' });
+          return HttpResponse.json(
+            {
+              connectionId: 'inc-1',
+              integrationId: 'incident-io',
+              connectUrl: 'https://connect.nango.dev/session-token',
+              sessionToken: 'incident-session-token',
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            },
+            { status: 201 },
+          );
+        }),
+      );
+
+      renderIntakeSection();
+
+      const section = await screen.findByRole('region', { name: 'incident.io follow-ups' });
+      await userEvent.click(within(section).getByRole('button', { name: 'Connect incident.io' }));
+
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(within(dialog).getByLabelText('incident.io API key'), 'inc-api-key');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
+
+      await waitFor(() => expect(nangoAuthCalls).toHaveLength(1));
+      expect(nangoConstructorOptions[0]).toEqual({ connectSessionToken: 'incident-session-token' });
+      expect(nangoAuthCalls[0]).toEqual({
+        integrationId: 'incident-io',
+        options: { credentials: { apiKey: 'inc-api-key' } },
+      });
+      expect(await screen.findByText('incident.io connected')).toBeInTheDocument();
+    });
+  });
+
+  describe('given incident.io follow-up intake is configured', () => {
+    it('routes only follow-up sources and marks incident board configuration as coming soon', async () => {
+      seedFactories();
+      const { savedBindings } = useIncidentioHandlers();
+      server.use(
+        http.get(`${TEST_BASE_URL}/web/factory/projects/:id/boards`, () =>
+          HttpResponse.json({ boards: [{ id: 'work', title: 'Work' }] }),
+        ),
+      );
+
+      renderIntakeSection();
+
+      const section = await screen.findByRole('region', { name: 'incident.io follow-ups' });
+      expect(within(section).getByRole('checkbox', { name: 'Incident follow-ups (acme)' })).toBeChecked();
+      expect(within(section).queryByRole('checkbox', { name: 'Incidents (acme)' })).not.toBeInTheDocument();
+      expect(within(section).getByText('Incident board configuration')).toBeInTheDocument();
+      expect(within(section).getByText('Coming soon')).toBeInTheDocument();
+
+      await userEvent.click(await screen.findByLabelText('Factory for Incident follow-ups (acme)'));
+      await userEvent.click(await screen.findByRole('option', { name: 'Acme Web' }));
+
+      await waitFor(() => expect(savedBindings).toHaveLength(1));
+      expect(savedBindings[0]).toEqual({
+        integrationId: 'incidentio',
+        sourceId: 'incidentio-source:follow-ups',
+        factoryProjectId: FACTORY_A,
+        board: null,
+      });
+
+      await userEvent.click(await screen.findByLabelText('Board for Incident follow-ups (acme)'));
+      await userEvent.click(await screen.findByRole('option', { name: 'Work' }));
+
+      await waitFor(() => expect(savedBindings).toHaveLength(2));
+      expect(savedBindings[1]).toEqual({
+        integrationId: 'incidentio',
+        sourceId: 'incidentio-source:follow-ups',
+        factoryProjectId: FACTORY_A,
+        board: 'work',
+      });
     });
   });
 

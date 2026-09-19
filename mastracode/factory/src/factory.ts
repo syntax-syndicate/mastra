@@ -209,8 +209,9 @@ export interface MastraFactoryConfig {
    * agent/session tools, intake, source control, and diagnostics — into the
    * system. When Platform credentials are configured, missing `github` and
    * `linear` integrations default to their Platform-backed implementations.
-   * A missing `jira` integration also defaults to Platform Jira, which
-   * discovers visible `jira` connections at runtime.
+   * Missing `jira` and `incidentio` integrations also default to their
+   * Platform-backed implementations, which discover visible `jira` and
+   * `incident-io` connections at runtime.
    */
   integrations?: FactoryIntegration[];
   /**
@@ -405,10 +406,7 @@ export class MastraFactory {
       if (!integrations.some(integration => integration.id === 'github')) {
         integrations.push(new PlatformGithubIntegration({ slug: this.#config.platform?.githubAppSlug }));
       }
-      if (
-        process.env.MASTRA_INCIDENT_IO_CONNECTION_ID &&
-        !integrations.some(integration => integration.id === 'incidentio')
-      ) {
+      if (!integrations.some(integration => integration.id === 'incidentio')) {
         integrations.push(new PlatformIncidentioIntegration());
       }
       if (!integrations.some(integration => integration.id === 'jira')) {
@@ -559,6 +557,7 @@ export class MastraFactory {
         storage: integrationStorage.forIntegration(integration.id),
         projects: factoryProjectsStorage,
         auth: routeAuth,
+        intake: intakeStorage,
       });
       if (integration.versionControl) {
         integration.versionControl.initialize({

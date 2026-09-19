@@ -53,6 +53,13 @@ export const queryKeys = {
     [...queryKeys.jiraIssuesAll(), factoryProjectId ?? null] as const,
   jiraIssue: (factoryProjectId: string | undefined, identifier: string | undefined, issueRef: string | undefined) =>
     ['jira', 'issue', factoryProjectId ?? null, identifier ?? null, issueRef ?? null] as const,
+  incidentioSources: () => ['incidentio', 'sources'] as const,
+  incidentioStatus: () => ['incidentio', 'status'] as const,
+  incidentioIssuesAll: () => ['incidentio', 'issues'] as const,
+  incidentioIssues: (factoryProjectId: string | undefined) =>
+    [...queryKeys.incidentioIssuesAll(), factoryProjectId ?? null] as const,
+  incidentioIssue: (factoryProjectId: string | undefined, issueRef: string | undefined) =>
+    ['incidentio', 'issue', factoryProjectId ?? null, issueRef ?? null] as const,
   intakeConfig: () => ['intake', 'config'] as const,
   intakeBindings: () => ['intake', 'bindings'] as const,
   intakeLabelRoutes: (factoryProjectId: string | undefined) =>

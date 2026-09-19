@@ -249,6 +249,7 @@ describe('Create Factory wizard', () => {
         github: { enabled: true, sourceIds: ['octo/hello'] },
         linear: { enabled: false, sourceIds: null },
         jira: { enabled: false, sourceIds: null },
+        incidentio: { enabled: false, sourceIds: null },
       },
     ]);
     expect(screen.getByTestId('pathname')).toHaveTextContent('/factories/fp-1');
@@ -462,11 +463,13 @@ describe('Create Factory wizard', () => {
         github: { enabled: true, sourceIds: ['octo/hello'] },
         linear: { enabled: false, sourceIds: null },
         jira: { enabled: false, sourceIds: null },
+        incidentio: { enabled: false, sourceIds: null },
       },
       {
         github: { enabled: true, sourceIds: ['octo/hello'] },
         linear: { enabled: true, sourceIds: ['lin-1'] },
         jira: { enabled: false, sourceIds: null },
+        incidentio: { enabled: false, sourceIds: null },
       },
     ]);
   });
@@ -505,11 +508,13 @@ describe('Create Factory wizard', () => {
         github: { enabled: true, sourceIds: ['octo/hello'] },
         linear: { enabled: false, sourceIds: null },
         jira: { enabled: false, sourceIds: null },
+        incidentio: { enabled: false, sourceIds: null },
       },
       {
         github: { enabled: true, sourceIds: ['octo/hello'] },
         linear: { enabled: false, sourceIds: null },
         jira: { enabled: true, sourceIds: ['jira-source-1'] },
+        incidentio: { enabled: false, sourceIds: null },
       },
     ]);
   });
@@ -543,6 +548,7 @@ describe('Create Factory wizard', () => {
         github: { enabled: true, sourceIds: ['octo/hello'] },
         linear: { enabled: false, sourceIds: null },
         jira: { enabled: false, sourceIds: null },
+        incidentio: { enabled: false, sourceIds: null },
       },
     ]);
   });

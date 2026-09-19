@@ -381,12 +381,12 @@ const incidentio = new IncidentioIntegration(); // Reads INCIDENT_IO_API_KEY.
 const factory = new MastraFactory({ storage, integrations: [incidentio] });
 ```
 
-For a Mastra Platform connection, use `PlatformIncidentioIntegration`. It proxies provider requests through `/v2/connections/{connectionId}/proxy` and reads `MASTRA_INCIDENT_IO_CONNECTION_ID` unless `connectionId` is passed to the constructor. `MastraFactory` installs it automatically when Platform credentials and that connection ID are present; an explicit integration with id `incidentio` takes precedence.
+For Mastra Platform connections, use `PlatformIncidentioIntegration`. It discovers every active `incident-io` connection at runtime and proxies provider requests through `/v2/connections/{connectionId}/proxy`. `MastraFactory` installs it automatically when Platform credentials are present; an explicit integration with id `incidentio` takes precedence.
 
 ```typescript
 import { PlatformIncidentioIntegration } from '@mastra/factory/integrations/platform/incidentio/integration';
 
-const incidentio = new PlatformIncidentioIntegration({ connectionId: 'connection-id' });
+const incidentio = new PlatformIncidentioIntegration(); // Reads Platform credentials from the environment.
 ```
 
 Both integrations expose incidents and incident follow-ups as separate Intake sources. Their provider-neutral Intake items can be imported onto any installed board, including custom boards. A reconciliation worker polls imported incidents and follow-ups every five minutes by default to refresh their provider state and metadata. Set `MASTRACODE_INCIDENT_IO_RECONCILE_ENABLED=false` to disable it or `MASTRACODE_INCIDENT_IO_RECONCILE_INTERVAL_MS` to a positive millisecond interval to change its cadence. Follow-up state updates map Factory completion and cancellation to incident.io's `completed` and `not_doing` statuses. incident.io does not expose Intake comments through these adapters.
