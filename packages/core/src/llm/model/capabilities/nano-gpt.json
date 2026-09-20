@@ -302,7 +302,6 @@
   ],
   "temperature": [
     "TEE/deepseek-v3.2",
-    "TEE/deepseek-v4-flash",
     "TEE/deepseek-v4.1-flash",
     "TEE/gemma-4-31b-it",
     "TEE/glm-5.1",
@@ -528,7 +527,6 @@
   "structuredOutput": [
     "NousResearch/hermes-4-405b",
     "NousResearch/hermes-4-405b:thinking",
-    "TEE/deepseek-v4-flash",
     "TEE/deepseek-v4.1-flash",
     "TEE/gemma-4-26b-a4b-uncensored",
     "TEE/gemma4-31b",
