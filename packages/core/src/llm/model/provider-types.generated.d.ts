@@ -757,8 +757,6 @@ export type ProviderModelsMap = {
     'z-ai/glm-4.6v-original',
     'z-ai/glm-4.7',
     'z-ai/glm-4.7-flash',
-    'z-ai/glm-4.7-flash-original',
-    'z-ai/glm-4.7-flash-original:thinking',
     'z-ai/glm-4.7-flash:thinking',
     'z-ai/glm-4.7-original',
     'z-ai/glm-4.7-original:thinking',
