@@ -5,6 +5,7 @@ import { Badge } from '@/ds/components/Badge';
 import type { BadgeVariant } from '@/ds/components/Badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/ds/components/Tooltip';
 import { AgentIcon } from '@/ds/icons/AgentIcon';
+import { McpServerIcon } from '@/ds/icons/McpServerIcon';
 import { MemoryIcon } from '@/ds/icons/MemoryIcon';
 import { ProcessorIcon } from '@/ds/icons/ProcessorIcon';
 import { ScorersIcon } from '@/ds/icons/ScorersIcon';
@@ -76,6 +77,7 @@ const ENTITY_TYPE_DISPLAY: Record<string, EntityTypeDisplay> = {
   tool: { label: 'Tool', Icon: ToolsIcon },
   scorer: { label: 'Scorer', Icon: ScorersIcon },
   memory: { label: 'Memory', Icon: MemoryIcon },
+  mcp_server: { label: 'MCP Server', Icon: McpServerIcon },
   input_processor: { label: 'Processor', Icon: ProcessorIcon },
   input_step_processor: { label: 'Processor', Icon: ProcessorIcon },
   output_processor: { label: 'Processor', Icon: ProcessorIcon },
