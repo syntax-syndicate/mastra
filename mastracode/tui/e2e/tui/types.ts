@@ -80,6 +80,10 @@ export type ScenarioName =
   | 'goal-resume-single-render'
   | 'controller-api-config'
   | 'headless-mcp-tool-availability'
+  | 'initial-prompt'
+  | 'initial-prompt-skill'
+  | 'initial-prompt-resume'
+  | 'tui-prompt-resume'
   | 'openai-strict-schema'
   | 'plan-approval-goal-handoff'
   | 'plan-approval-handoff'
@@ -252,7 +256,10 @@ export type McE2eStartMastraCodeAppOptions = {
   setupDebugLogging?: boolean;
   startupWarnings?: string[];
   tui?: Partial<
-    Pick<MastraTUIOptions, 'appName' | 'initialMessage' | 'inlineQuestions' | 'processMemoryDiagnostics' | 'verbose'>
+    Pick<
+      MastraTUIOptions,
+      'appName' | 'initialMessage' | 'resumeSkipNotice' | 'inlineQuestions' | 'processMemoryDiagnostics' | 'verbose'
+    >
   >;
 };
 
